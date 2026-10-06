@@ -1,0 +1,65 @@
+{
+  "cli_version": "0.11.4-nightly.202610050640.3299a0f9d",
+  "checkpoint_id": "a75385510159",
+  "strategy": "manual-commit",
+  "branch": "fix/markdown-fence-extraction",
+  "checkpoints_count": 8,
+  "files_touched": [
+    "CHANGELOG.md",
+    "internal/sem/identity_revision_test.go",
+    "internal/sem/parser.go",
+    "internal/sem/provider.go",
+    "internal/sem/testdata/fixtures/csharp-basic.ndjson.golden",
+    "internal/sem/testdata/fixtures/csharp-fields.ndjson.golden",
+    "internal/sem/testdata/fixtures/csharp-oo.ndjson.golden",
+    "internal/sem/testdata/fixtures/go-async.ndjson.golden",
+    "internal/sem/testdata/fixtures/go-basic.ndjson.golden",
+    "internal/sem/testdata/fixtures/go-clones.ndjson.golden",
+    "internal/sem/testdata/fixtures/go-fields.ndjson.golden",
+    "internal/sem/testdata/fixtures/go-tests.ndjson.golden",
+    "internal/sem/testdata/fixtures/go-types.ndjson.golden",
+    "internal/sem/testdata/fixtures/java-basic.ndjson.golden",
+    "internal/sem/testdata/fixtures/java-fields.ndjson.golden",
+    "internal/sem/testdata/fixtures/java-oo.ndjson.golden",
+    "internal/sem/testdata/fixtures/julia-r-basic.ndjson.golden",
+    "internal/sem/testdata/fixtures/multilang-relations.ndjson.golden",
+    "internal/sem/testdata/fixtures/php-basic.ndjson.golden",
+    "internal/sem/testdata/fixtures/php-oo.ndjson.golden",
+    "internal/sem/testdata/fixtures/python-basic.ndjson.golden",
+    "internal/sem/testdata/fixtures/python-imports.ndjson.golden",
+    "internal/sem/testdata/fixtures/python-oo.ndjson.golden",
+    "internal/sem/testdata/fixtures/rust-basic.ndjson.golden",
+    "internal/sem/testdata/fixtures/rust-oo.ndjson.golden",
+    "internal/sem/testdata/fixtures/services-config.ndjson.golden",
+    "internal/sem/testdata/fixtures/terraform-basic.ndjson.golden",
+    "internal/sem/testdata/fixtures/typescript-basic.ndjson.golden",
+    "internal/sem/testdata/fixtures/typescript-events.ndjson.golden",
+    "internal/sem/testdata/fixtures/typescript-fields.ndjson.golden",
+    "internal/sem/testdata/fixtures/typescript-http.ndjson.golden",
+    "internal/sem/testdata/fixtures/typescript-imports.ndjson.golden",
+    "internal/sem/testdata/fixtures/typescript-oo.ndjson.golden"
+  ],
+  "sessions": [
+    {
+      "metadata": "/a7/5385510159/0/metadata.json",
+      "transcript": "/a7/5385510159/0/full.jsonl",
+      "compact_transcript": "/a7/5385510159/0/transcript.jsonl",
+      "content_hash": "/a7/5385510159/0/content_hash.txt",
+      "prompt": "/a7/5385510159/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 204,
+    "cache_creation_tokens": 483036,
+    "cache_read_tokens": 18415546,
+    "output_tokens": 92370,
+    "api_call_count": 102,
+    "subagent_tokens": {
+      "input_tokens": 186,
+      "cache_creation_tokens": 338162,
+      "cache_read_tokens": 7924740,
+      "output_tokens": 11366,
+      "api_call_count": 93
+    }
+  }
+}
