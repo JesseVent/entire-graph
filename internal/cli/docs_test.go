@@ -178,3 +178,27 @@ func TestDocsSkipsCoChangeFromHubCodeFiles(t *testing.T) {
 		t.Fatalf("items = %+v, want only a.md co-changing with store.go", got.Items)
 	}
 }
+
+func TestDocsReportsBothSnapshotsParseFailures(t *testing.T) {
+	t.Parallel()
+	broken := sem.PartialFailure{Code: "parse_error", Severity: "error", FilePath: "app/broken.go", Language: "Go"}
+	removed := sem.PartialFailure{Code: "parse_error", Severity: "error", FilePath: "app/gone.go", Language: "Go"}
+	base := sem.ProviderSnapshot{Header: sem.SnapshotHeader{Commit: "c", PartialFailures: []sem.PartialFailure{broken, removed},
+		Stats: sem.ProviderStats{CompletenessLevel: "degraded"}}}
+	head := sem.ProviderSnapshot{Header: sem.SnapshotHeader{PartialFailures: []sem.PartialFailure{broken},
+		Stats: sem.ProviderStats{CompletenessLevel: "ok"}},
+		Files: []sem.FileRecord{{ID: "file:app/new.go", Path: "app/new.go", Blob: "1", Language: "Go"}}}
+
+	// A failure in either snapshot can hide docs from the list, so both are
+	// reported once each, and the worse completeness level wins.
+	got := buildDocsResponse(base, head, nil, nil, 50)
+	if len(got.PartialFailures) != 2 || got.PartialFailures[0] != broken || got.PartialFailures[1] != removed ||
+		got.Stats.CompletenessLevel != "degraded" {
+		t.Fatalf("partial_failures = %+v, level = %q", got.PartialFailures, got.Stats.CompletenessLevel)
+	}
+	var text bytes.Buffer
+	writeDocsText(&text, got)
+	if !strings.Contains(text.String(), "Completeness: degraded") || !strings.Contains(text.String(), "app/gone.go") {
+		t.Fatalf("text output does not report the failures:\n%s", text.String())
+	}
+}
