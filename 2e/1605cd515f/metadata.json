@@ -1,0 +1,24 @@
+{
+  "cli_version": "0.11.4-nightly.202610050640.3299a0f9d",
+  "checkpoint_id": "2e1605cd515f",
+  "strategy": "manual-commit",
+  "branch": "feat/docs-init",
+  "checkpoints_count": 8,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/2e/1605cd515f/0/metadata.json",
+      "transcript": "/2e/1605cd515f/0/full.jsonl",
+      "compact_transcript": "/2e/1605cd515f/0/transcript.jsonl",
+      "content_hash": "/2e/1605cd515f/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
