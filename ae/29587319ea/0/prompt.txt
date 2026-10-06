@@ -1,0 +1,269 @@
+/init
+
+---
+
+entire plugin install graph
+
+---
+
+mise run intall
+
+---
+
+i hate when my projects documentation and is not being up to date. 
+
+What im picturing is like each document gets split up, turned into. graph and turned into an ontology. Then when a doc update gets made you trace the graph back and chain your updates together so all the related docs get updated along side it. Why entire? its there reading them anyway I think it makes sense. Thoughts?
+
+---
+
+entire plugin install brain
+
+---
+
+lets do the plan
+
+---
+
+<task-notification>
+<task-id>adfa4366b1ccd63da</task-id>
+<tool-use-id>toolu_011zF3DMkFNVutPY8kSEGKyu</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jvent-Dev-entire-graph/01f054e8-f547-469c-9360-1e6ccad82720/tasks/adfa4366b1ccd63da.output</output-file>
+<status>completed</status>
+<summary>Agent "Markdown parsing and name-match edges" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I found all four pieces. The short version: Markdown is scanned by a hand-written regex, not tree-sitter, and no `X-` relation type exists in code yet.
+
+**1. How Markdown headings become symbols**
+- `.md` and `.markdown` are in `treeSitterLanguages` with no grammar (`parser.go:103-104`). So `ParseWithStatus` hands them to `fallbackEntities` (`parser.go:282`), which calls `markdownEntities` (`parser.go:3556`, body at `3735-3760`). It is a line-by-line regex scan.
+- Markdown counts as **semantic, not inventory-only**: `inventoryOnly` is false, and `supportsSemanticExtraction` (`provider.go:713`) returns false only for inventory-only specs. Separately, `health.go:42` does not count it as source.
+- Each heading becomes kind `section` with Name = `slugName(heading text)` and Signature = `"markdown heading &lt;text&gt;"`. **StartLine and EndLine are both the heading line.** The section has no body range.
+- Code fences become `code_fence_&lt;n&gt;_&lt;lang&gt;` symbols, also one line each.
+- **Bug:** the scanner never tracks whether it is inside a fence. A `# comment` line inside a bash fence becomes a section.
+- Entities turn into symbols in `entitySymbols` (`provider.go:1976`). The ID is `symbolID(repo, "Markdown", path, "section", name)` (`provider.go:28462`). Duplicate headings get a `#sig:&lt;hash&gt;` suffix, then `#2`, `#3` for identical text (`2020-2032`).
+- **There is no heading nesting.** Lexical parents need a range that strictly encloses the child (`nested_containers.go:67`), and one-line sections never do. `containerName` splits on the last `.` (`provider.go:28586`), so a heading like `v1.2` can only pick up a container by accident. The `DEFINES` edge from the file is emitted at `provider.go:4819`.
+- **The slug is not GitHub's.** `slugName` (`parser.go:4138-4146`) keeps case, keeps `.`, `:` and `/`, merges runs of other characters into one `-`, and trims the ends. GitHub lowercases, drops punctuation, turns each space into `-` without merging, and numbers duplicates `-1`, `-2`. So `What this gives you` → `What-this-gives-you` here and `what-this-gives-you` on GitHub; `Foo &amp; Bar` → `Foo-Bar` vs `foo--bar`.
+
+**2. Existing Markdown body scanning**
+Nothing scans for inline code spans or `[text](path)` links. What exists:
+- `proseSectionHeadingLines` and `proseSectionHeadingAt` (`search_prose_parent.go:120-140`) map a line to the heading above it. Reuse these to compute section spans.
+- `searchQueryURLPattern` (`search.go:985`) only handles URLs in query text.
+
+**3. Closest pattern for name-only cross-file edges**
+There is no general name-resolution pass after parsing. Each relation pass resolves names itself inside `forEachRelation` (`provider.go:4690`).
+- The global name index `symbolsByShortName` is filled at `provider.go:4866`, gated by `needsGlobalSymbolsByShortName` (`4716`).
+- The workspace-wide passes run in order at `provider.go:6427-6474`.
+- **`testRelations` plus `resolveTestSubject` (`provider.go:12159-12261`) is the closest pattern to copy.** It tries same file, then imports, then a unique match (`name_only`), then a unique match in the same directory (`package`). Ambiguous names are dropped.
+- `resolveTypeReference` (`12474`) does the same with confidence values.
+- `configuresRelations` (`12529`) is the template for reading content per file and filtering by language through `recordsByRelationSupport` (`1711`). Its targets are external records (`externalID("config", …)`, `28470`), not symbols.
+- `knownFiles` (`provider.go:5005`) is the set of repo paths for checking link targets.
+- **No CLI-flag symbols exist anywhere.** A backticked flag would need an external target, as CONFIGURES does, or be skipped.
+- `impactNonCodeMention` (`internal/cli/impact.go:323`) already treats any `name_only` edge from a doc file as a mention, not a dependency.
+
+**4. Relation records and type validation**
+- `RelationRecord` is defined at `provider.go:391`. Fields: FromID, ToID, Type, Confidence, Reason, RelationScope, Resolution, TargetKind, Evidence (`412`), WarningCodes (always a non-nil `[]string{}`), and EvidenceDropped.
+- Emitted types are not checked at runtime. `relationTypes` (`provider.go:68`) sets which types the full profile emits (`632`) and what `capabilities` reports (`677`). Tests enforce it: `provider_test.go:12903` fails on a type missing from `relationTypes`, and `TestCapabilityMatrixCoversEmittedRelations` requires a per-language entry in `ooRelationSupport` (`provider.go:105-207`).
+- **No `X-` relation type exists in code.** The rule lives only in `docs/adr/0001-ga-schema-contract.md:36`.
+
+**Where to add (a) and (b)**
+1. In `markdownEntities` (`parser.go:3739`): track fence state, and set each section's EndLine to the line before the next heading of equal or higher level. Nesting then works through `lexicalEntityParents` for free. Adding a body range changes the BodyHash but not the ID.
+2. Add `X-entire:MENTIONS` and `X-entire:LINKS_TO` to `relationTypes` and `"Markdown": {…}` to `ooRelationSupport`. Add the mentions type to the `needsGlobalSymbolsByShortName` condition (`4716`).
+3. Add one pass after the TESTS block (`provider.go:6450`), modeled on `testRelations`:
+   - **(a)** For each section, scan its lines outside fences for backtick spans. Look up file paths in `knownFiles` and identifiers in `symbolsByShortName`. Resolve with a function shaped like `resolveTestSubject`, dropping ambiguous names. Use `Resolution: "name_only"` with `Evidence{Kind: "inline_code"}`.
+   - **(b)** Parse `[text](path#anchor)`, resolve the path relative to the doc's directory against `knownFiles`, then match the anchor against the target file's section symbols using a new GitHub-style slug function over the heading text in the Signature. Keep `slugName` unchanged so existing IDs stay stable. Use `Resolution: "exact"`, and point at the file ID when there is no anchor.
+
+**Helpers to reuse:** `proseSectionHeadingLines`/`proseSectionHeadingAt`, `knownFiles`, `symbolsByShortName`, the `resolveTestSubject` ambiguity order, `fileID`/`externalID`, `recordsByRelationSupport`, and `normalize` (`parser.go:10087`).
+
+I skipped CLI-flag symbol extraction; it's only worth adding if flag mentions turn out to matter.</result>
+<usage><subagent_tokens>113596</subagent_tokens><tool_uses>42</tool_uses><duration_ms>233235</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ab0dba772bdff9a2a</task-id>
+<tool-use-id>toolu_01F8XUGbk37GY9cTMecF6e1U</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jvent-Dev-entire-graph/01f054e8-f547-469c-9360-1e6ccad82720/tasks/ab0dba772bdff9a2a.output</output-file>
+<status>completed</status>
+<summary>Agent "Tests, goldens, capability contracts" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I didn't edit anything. The main thing to know before choosing a design: an `X-entire-graph:` type is silently dropped at runtime unless it is added to `relationTypes`, so neither option avoids touching that list.
+
+**1. Golden snapshots**
+- The fixture list is `goldenFixtures` at `internal/sem/golden_test.go:582-614` (29 entries). The `-update` flag is at `:571`. Baselines are `internal/sem/testdata/fixtures/&lt;name&gt;.ndjson.golden`, plus the aggregate `testdata/fixtures/quality_coverage.json` (path at `golden_test.go:691`).
+- No golden fixture contains Markdown today. The only `.md` file is `testdata/fixtures/formats-config/README.md`, and `formats-config` is not in `goldenFixtures` and has no golden file, so nothing snapshots it. `quality_coverage.json` has no Markdown in `file_languages`.
+- If only Markdown emits new edges, no golden changes. You'd need to add a fixture (or list `formats-config`) with `.md` and `.go` files.
+- If you append a core type, all 29 goldens change. Each header carries `"relation_set":[...]`, which is the full list (built from `relationTypes` via `provider.go:632`). `quality_coverage.json`'s `relation_types` also changes once a fixture emits the new type.
+
+**2. Contract tests, (i) new core type vs (ii) `X-` type**
+- `TestResultWireShapeIsBoundToTheSchemaVersion` (`result_shape_contract_test.go:885`, digest `a8d4cd9b7a4a6735` at `:889`) hashes the struct shape of `Result`, not relation-type values. It doesn't fail in either case.
+- `provider_test.go:12669-12671` checks that capabilities include every `relationTypes` entry. It passes for (i) because capabilities copies the list; (ii) isn't checked.
+- `TestCapabilitiesReportRelationSupportPerLanguage` (`provider_test.go:12888`, check at `:12903`) fails if any declared per-language relation is not in `relationTypes`. So (ii), declared for Markdown, fails here unless the `X-` type is also in `relationTypes`.
+- `TestCapabilityMatrixCoversEmittedRelations` (`golden_test.go:795`) fails in both cases if a golden emits the type from a `Markdown:` symbol and Markdown doesn't declare it. Edges whose `from_id` is a file are skipped (`:829`).
+- `TestCapabilityRelationDeclarationsMatchIsolatedExtraction` and the probe-coverage test (`capability_relation_union_test.go:688`, `:633`) only cover call-extraction languages and `genericRelationTypes` (`:600`). Markdown isn't one of those, so they're unaffected.
+- `TestCapabilityReportCarriesEveryDeclaredRelation` (`capability_relation_union_test.go:885`) passes as long as the `ooRelationSupport` key is exactly `"Markdown"`.
+- `TestHeuristicRelationTypesMatchDocumentation` (`golden_test.go:886`) applies only if you put the type in `HeuristicRelationTypes` (`provider.go:680`). Then `docs/semantic-provider-requirements.md:572` must list it too.
+- Nothing handles `X-` types anywhere. The only mentions are in docs (ADR `:36`, `semantic-provider-requirements.md:130`, `snapshot-format.md:17`). There's no allowlist or validation. `spec.emits(r.Type)` drops unknown types at `provider.go:1416` and `search_cache.go:744`.
+- `schema_compat.go` only checks the version string.
+
+**3. Capabilities**
+- `Capabilities()` is at `provider.go:636`. `SupportedRelationTypes` is copied from `relationTypes`, and `RelationSupportByLanguage` comes from `relationSupportByLanguage()` (`:753`) and `mergeLanguageSupport` (`:790`). That gives DEFINES/CONTAINS, plus CALLS/CONSTRUCTS for call-extraction languages, plus IMPORTS, plus `ooRelationSupport[lang]`.
+- To declare the new relation, add `"Markdown": {"&lt;TYPE&gt;"}` near the config-language entries (`provider.go:197-207`).
+- If the emitting pass routes through `recordsByRelationSupport` (`provider.go:1711`), that declaration also gates emission. Without it, the pass emits nothing for Markdown.
+- Decide fast-profile membership at `provider.go:630`.
+
+**4. Docs to update**
+- `AGENTS.md:80` ("all 30 types").
+- `docs/semantic-provider-requirements.md:88-95` (full-profile list), `:96-103` (fast, if applicable) and the `## Relations` bullets at `:285-350`.
+- `docs/archive/2026-08-12-legacy-details.md:56,174` also say 30, but they're archived.
+- README, `snapshot-format.md` and `commands.md` don't enumerate relation types.
+
+**5. CHANGELOG.md**
+Keep a Changelog format. There's no `Unreleased` heading; the open section is `## [0.5.0] - unreleased`, so add a bullet under its `### Added`. Top of the file:
+```
+# Changelog
+
+All notable changes to Entire Graph are recorded here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+Entries describe user-visible behavior. Nightly prereleases
+(`vX.Y.Z-nightly.*`) are snapshots of the development branch and are not listed
+here. Releases before 0.5.0 have no hand-written entry: their contents are the
+auto-generated notes on
+[the releases page](https://github.com/entireio/entire-graph/releases).
+
+## [0.5.0] - unreleased
+
+### Added
+
+- Added an experimental SCIP snapshot export, and versioned persisted diff and analyze output with schema-major enforcement, cache-validity binding, and a wire-shape regression freeze.
+- Added a `graph health` command with per-source-file health accounting, and made `graph query` the canonical search command with support for trailing free-text queries.
+- Added a persistent strict agent guidance mode, with Graph and Brain agent instructions coordinated to stay consistent.
+- Added nightly LoCoMo benchmark CI for the entire-graph arm, authenticated via OIDC with no stored credentials.
+- Added a `NOTICES` file to every release archive, covering the third-party parser sources and Go modules statically linked into the binary.
+
+### Changed
+
+- Upgraded the Go toolchain to 1.27.
+- Improved snapshot, search, and analyze performance and substantially reduced memory allocation, and made `stats` return a fast, single-line answer instead of a full rescan.
+- Statusline now shows only the savings estimate by default and labels it clearly as an estimate rather than an exact count.
+- Aligned Graph's trail runners with Brain's and hardened CI with Windows test sharding and safer nightly prerelease publishing.
+
+### Fixed
+```
+
+**6. Reusable test helpers**
+- In `internal/sem`:
+  - `writeFile(t, repo, path, content)` at `provider_test.go:13805`.
+  - `git(t, repo, args...)` at `analyze_test.go:1797`; `write` is at `:1786`.
+  - `buildParseFailureRepo` at `analyze_test.go:1769` returns repo, base and head for `AnalyzeGitRange`. Usage is at `:15-38`.
+  - `copyFixtureTree` and `buildFixtureNDJSON(t, name)` at `golden_test.go:709`.
+  - `StreamSnapshot` / `BuildProviderSnapshot` worktree pattern at `golden_test.go:20-75`.
+- In `internal/cli`:
+  - `write` at `root_test.go:1277` and `git` at `:1299`.
+  - `TestImpactEndToEndOnFixtureRepo` (`impact_test.go:227`) is a full init-commit-modify-impact template.
+  - `runVerb(t, repo, cacheDir, argv)` at `termsafe_verbs_test.go:163`.
+
+**Design note:** a Markdown `section` symbol spans only its heading line (`parser.go:3746`, start = end = `i+1`). Inline code and links in the section body fall outside the symbol's block, so you'll have to compute heading-to-next-heading ranges yourself.</result>
+<usage><subagent_tokens>109993</subagent_tokens><tool_uses>46</tool_uses><duration_ms>275829</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a17dff79395e85109</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jvent-Dev-entire-graph/01f054e8-f547-469c-9360-1e6ccad82720/tasks/a17dff79395e85109.output</output-file>
+<status>completed</status>
+<summary>Agent "Diff, impact, co-change consumers" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I ran `diff` on 5fd309b and dumped `edges` and `symbols` for this repo to confirm the main points below. Nothing was edited.
+
+## 1. diff / analyze / commit
+- **Types:** `Entity` is at internal/sem/model.go:11 and `EntityChange` (type, kind, name, old/new name, signature, path, start lines, `dependents_count`, similarity, reconciliation) at model.go:65. The JSON output is `Result{identity_revision, checkpoint, base, head, files[]{path, old_path, status, language, changes[]}, warnings, schema_version, producer_version}` (model.go:85-111). `printResult` in root.go:1219 just runs `json.MarshalIndent` on that struct. `runAnalyze` is an alias of `runDiff` (root.go:855), which goes through `analyzeAndPrint` (root.go:1178).
+- **Markdown in diff:** Markdown sections are entities, but each one covers only its heading line. `markdownEntities` (parser.go:3740) calls `simpleFallbackEntity` with start line equal to end line, and the body hash is a hash of the heading text (parser.go:4122). So editing the prose under a heading does not show as a section `body_changed`. It falls through to `moduleScopeChange` (analyze.go:1641) and appears as `kind:"module", name:"AGENTS.md"`; that's what the 5fd309b run showed. The snapshot has the same limit: `What-this-gives-you` has start_line 16 and end_line 16.
+- **Dependent count:** it never uses graph relations. `addDependentCountsWithProgress` (dependents.go:40) runs `git grep` for the changed short names (`referenceName`, dependents.go:664). It then token-matches inside the parsed entity blocks of every `Supported` file (dependents.go:398-437), and the count is the number of distinct entity keys (dependents.go:59). `analyze.go` and `dependents.go` never load the snapshot. New MENTIONS edges would therefore not count as dependents, and nothing needs excluding. Markdown already adds almost nothing today, because only heading lines get scanned.
+- **Where docs-to-review fits:** add a top-level `Result.DocsToReview` (or `review_docs`) with `omitempty`, filled in `analyzeAndPrint` after the analysis. It would need a snapshot at head, which diff doesn't load today, so it adds cost. `Result` is a pinned schema persisted into checkpoints (model.go:100), so this needs a `SchemaVersion` bump.
+
+## 2. FILE_CHANGES_WITH
+- Computed by `fileChangesWithRelations` (provider.go:12570) on top of `gitutil.FileCochanges` (gitutil/git.go:1040).
+- **Bounds:** the last 256 commits from the snapshot commit, and commits touching more than 50 files are skipped. Pairs need both files in the snapshot. Confidence is 0.55, or 0.7 when the pair changed together 3 or more times.
+- **Granularity:** file to file only.
+- **Where it's emitted:** only in the full profile (`spec.emits` at provider.go:1491 and search_cache.go:778). The cache can serve co-change edges from older history (search_cache.go:890). Only the snapshot and `impact` (impact.go:488) use it; diff/analyze can't see it.
+
+## 3. impact
+- **Caller walk:** follows only CALLS, CONSTRUCTS and ASYNC_CALLS (`impactCallRelation`, impact.go:302).
+- **How doc mentions are found:** a mention is a `name_only` CALLS edge from a non-program file or an inventory-only language (`impactNonCodeMention`, impact.go:323). Mentions are labelled `impactMentionDetail` (impact.go:313), kept at depth 1 only (impact.go:536-563), and sorted last by `impactSectionOf` (around line 630).
+- **No real mention edges here:** I found no Markdown-sourced CALLS edges in this repo's snapshot; the test impact_doc_mention_test.go uses synthetic edges. Markdown sections currently emit only DEFINES and CONTAINS.
+- **For a "Docs mentioning this" section:**
+  - add a `case relation.Type == "&lt;MENTIONS&gt;"` in the loop at impact.go:468 that collects incoming edges into `docEntries`;
+  - add a `DocMentions impactSection` field next to `CoChanges` (impact.go:114);
+  - set it near line 589 and include it in the trim at line 728;
+  - render it in the text output around lines 783-809.
+
+## 4. neighbors / edges
+- **There is no allowlist.**
+  - neighbors uppercases the requested type (neighbors.go:262) and compares it exactly (neighbors.go:620).
+  - edges uppercases both sides (root.go:753, 658).
+  - snapshot-query uppercases the request (snapshot_query.go:92).
+- **Risk:** a mixed-case type like `X-entire-graph:MENTIONS` can never match in neighbors, and possibly not in snapshot-query. Use an all-uppercase type such as `MENTIONS`, or compare case-insensitively.
+- **Emission allowlist:** the real gate is `relationTypes` (provider.go:68). The full profile emits that set, and `spec.emits` drops anything else (search_cache.go:744, provider.go:1416). Undeclared types also fail `TestCapabilityMatrixCoversEmittedRelations` (golden_test.go:795). Probably also add it to `HeuristicRelationTypes` (provider.go:680).
+
+## 5. Search ranking
+Every relation consumer in search filters by type, so a new type would not change ranking:
+- `searchGraphCallerBoosts`: CALLS, ASYNC_CALLS, CONSTRUCTS (search.go:4500/4539)
+- `expandGraphCandidates`: the `searchExpansionRelation` list, confidence ≥ 0.7 (search.go:4630/4752)
+- search_related.go: call/override/inherit relations, plus SIMILAR_TO at :602
+- search_callee.go:149 and search_covertest.go:460: call relations (covertest also TESTS)
+- search_typecard.go:343
+- search_sigtypes.go:337: CONTAINS only
+
+Ranking would only change if MENTIONS were added to one of those lists or emitted as CALLS.
+
+## Risks
+- Section spans are heading-only, so the MENTIONS extractor must compute heading-to-next-heading spans itself and put prose line numbers in the evidence.
+- Name-only resolution on common words (`Run`, `Parse`) will be noisy. Use a lower confidence (it stays below the 0.7 expansion threshold anyway) and drop ambiguous names.
+- Emitting mentions as CALLS instead would distort impact callers, search boosts and expansion.
+- The snapshot cache key and schema need a bump, and golden tests will churn.</result>
+<usage><subagent_tokens>123443</subagent_tokens><tool_uses>56</tool_uses><duration_ms>340283</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>by0ayf13x</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jvent-Dev-entire-graph/01f054e8-f547-469c-9360-1e6ccad82720/tasks/by0ayf13x.output</output-file>
+<status>completed</status>
+<summary>Background command "Run gofmt, vet, and full test suite for PR 1" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b391gjiq5</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jvent-Dev-entire-graph/01f054e8-f547-469c-9360-1e6ccad82720/tasks/b391gjiq5.output</output-file>
+<status>completed</status>
+<summary>Background command "Rerun full suite with XDG excludes neutralized" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bm88kqyoj</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jvent-Dev-entire-graph/01f054e8-f547-469c-9360-1e6ccad82720/tasks/bm88kqyoj.output</output-file>
+<status>completed</status>
+<summary>Background command "Run full suite through mise test task" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bem9fx1r9</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jvent-Dev-entire-graph/01f054e8-f547-469c-9360-1e6ccad82720/tasks/bem9fx1r9.output</output-file>
+<status>completed</status>
+<summary>Background command "Run full suite for PR 2" completed (exit code 0)</summary>
+</task-notification>
