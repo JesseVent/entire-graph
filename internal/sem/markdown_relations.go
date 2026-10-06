@@ -507,8 +507,11 @@ func markdownSpanPath(span string) string {
 func markdownStaleSpan(span string, topDirs, qualifiers, fileNames map[string]bool, codeByShortName map[string][]SymbolRecord, exists func(string) bool) (MarkdownProblem, bool) {
 	if file := markdownSpanPath(span); strings.Contains(file, "/") && path.Ext(file) != "" {
 		// A placeholder or glob (`internal/sem/<lang>.go`, `docs/*.md`) is a
-		// pattern, not a path.
-		if strings.ContainsAny(file, " *?[]{}<>$~") {
+		// pattern, not a path. A span is repository content, so one that leaves
+		// the repository once cleaned (`../../etc/passwd`, `/etc/hosts`) is
+		// never probed; the top-level-directory check below would also refuse
+		// it, but this does not depend on what the repository's top level holds.
+		if strings.ContainsAny(file, " *?[]{}<>$~") || file == ".." || strings.HasPrefix(file, "../") || strings.HasPrefix(file, "/") {
 			return MarkdownProblem{}, false
 		}
 		if first, _, _ := strings.Cut(file, "/"); topDirs[first] && !exists(file) {

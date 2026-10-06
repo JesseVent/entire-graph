@@ -139,6 +139,7 @@ func TestMarkdownReferenceProblemsReportsOnlyWhatItCanDecide(t *testing.T) {
 			"# Guide",
 			"Call `thing.Helper()` and `thing.Gone()`. `json.Marshal` is external and `thing.go` is a file name.",
 			"See `thing/thing.go:3`, `thing/old.go`, `thing/example.go`, `thing/<lang>.go` and `docs/*.md`.",
+			"Outside the repository: `../../etc/passwd.txt:1`, `/etc/hosts.txt`, `thing/../../etc/x.txt`, [up](../../etc/y.md).",
 			"Links: [guide](docs/guide.md#some-heading), [bad anchor](docs/guide.md#nope), [missing](docs/nope.md),",
 			"[dir](thing/), [image](img/logo.png), [site](https://example.com), [self](#guide), [self bad](#nowhere).",
 			"```go",
@@ -162,7 +163,12 @@ func TestMarkdownReferenceProblemsReportsOnlyWhatItCanDecide(t *testing.T) {
 		snapshot.Files = append(snapshot.Files, FileRecord{ID: fileID(repoKey, path), Path: path, Language: language})
 		snapshot.Symbols = append(snapshot.Symbols, entitySymbols(repoKey, path, language, entities)...)
 	}
+	// Spans and links are repository content: none may make the audit read a
+	// path outside the repository.
 	readLines := func(path string) ([]string, bool) {
+		if path == ".." || strings.HasPrefix(path, "../") || strings.HasPrefix(path, "/") {
+			t.Errorf("probed %q, outside the repository", path)
+		}
 		content, ok := contents[path]
 		return strings.Split(content, "\n"), ok
 	}
@@ -180,9 +186,9 @@ func TestMarkdownReferenceProblemsReportsOnlyWhatItCanDecide(t *testing.T) {
 	want := []string{
 		"README.md:2 stale_name thing.Gone()",
 		"README.md:3 stale_path thing/old.go",
-		"README.md:4 missing_anchor docs/guide.md#nope",
-		"README.md:4 broken_link docs/nope.md",
-		"README.md:5 missing_anchor #nowhere",
+		"README.md:5 missing_anchor docs/guide.md#nope",
+		"README.md:5 broken_link docs/nope.md",
+		"README.md:6 missing_anchor #nowhere",
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("problems =\n  %s\nwant\n  %s", strings.Join(got, "\n  "), strings.Join(want, "\n  "))
