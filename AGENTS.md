@@ -115,7 +115,7 @@ entire graph checkpoint <id> --json                 # the commit behind an Entir
 **When:** judging whether a change is safe to keep / revert / continue, or reviewing a branch/PR. High dependent counts on a signature change = run tests first.
 
 ### 📝 docs — *which docs did this change make stale?*
-Compares the working tree with HEAD and lists Markdown sections that point, one hop, at what changed: sections that name a changed or removed symbol in inline code (or a removed file by path), sections that link to a changed section or a removed file, and Markdown files that usually change with a changed file but were not touched. Sections the change already edited are counted, not listed. Built on the experimental `X-entire-graph:MENTIONS` / `LINKS_TO` relations, so a doc that restates a fact without naming it is not found.
+Compares the working tree with HEAD and lists Markdown sections that point, one hop, at what changed: sections that name a changed or removed symbol in inline code (or a removed file by path), sections that link to a changed section or a removed file, and Markdown files that usually change with a changed code file but were not touched. Sections the change already edited are counted, not listed. Built on the experimental `X-entire-graph:MENTIONS` / `LINKS_TO` relations, so a doc that restates a fact without naming it is not found.
 
 ```sh
 entire graph docs --repo . [--format text|json] [--limit 50]

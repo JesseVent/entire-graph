@@ -149,10 +149,10 @@ func parseDocsFlags(args []string) (docsFlags, error) {
 // buildDocsResponse lists the doc sections that point, one hop, at something
 // the working tree changed relative to HEAD:
 //
-//   - a section that MENTIONS a changed or removed code symbol, or a changed file;
-//   - a section that LINKS_TO a changed or removed section, or a changed file;
-//   - a Markdown file that usually changes with a changed file (FILE_CHANGES_WITH)
-//     but was not touched.
+//   - a section that MENTIONS a changed or removed code symbol, or a removed file;
+//   - a section that LINKS_TO a changed or removed section, or a removed file;
+//   - a Markdown file that usually changes with a changed code file
+//     (FILE_CHANGES_WITH) but was not touched.
 //
 // Mentions and links are read from both snapshots: the HEAD one is what still
 // records a mention of a symbol the change removed or renamed. A section the
@@ -296,17 +296,38 @@ func buildDocsResponse(base, head sem.ProviderSnapshot, readBase, readHead lineR
 		}
 	}
 	// Co-change pairs need both files present, so a pair with a removed file
-	// survives only in the HEAD snapshot.
+	// survives only in the HEAD snapshot. Only a code change uses them: a doc
+	// edit reaches other docs through links and mentions, and a hub such as
+	// README.md co-changes with most docs, so it would list them all.
+	docPartners := map[string]map[string]string{} // changed code path -> doc ID -> doc path
 	for _, relation := range append(append([]sem.RelationRecord{}, head.Relations...), base.Relations...) {
 		if relation.Type != "FILE_CHANGES_WITH" {
 			continue
 		}
 		for _, pair := range [][2]string{{relation.FromID, relation.ToID}, {relation.ToID, relation.FromID}} {
 			changedPath, docPath := changedFileIDs[pair[0]], headFilePaths[pair[1]]
-			if changedPath == "" || docPath == "" || changedFiles[docPath] || headFiles[docPath].Language != "Markdown" {
+			if changedPath == "" || docPath == "" || headFiles[docPath].Language != "Markdown" ||
+				headFiles[changedPath].Language == "Markdown" || baseFiles[changedPath].Language == "Markdown" {
 				continue
 			}
-			addReason(pair[1], docsReason{Kind: "co_changes", Target: changedPath, Path: changedPath, Change: "changed"})
+			if docPartners[changedPath] == nil {
+				docPartners[changedPath] = map[string]string{}
+			}
+			docPartners[changedPath][pair[1]] = docPath
+		}
+	}
+	for changedPath, docs := range docPartners {
+		// ponytail: a code file that co-changes with more than three docs is a
+		// hub (help text, a command switch) whose pairs say little about any one
+		// doc, so it contributes none. Upgrade: weigh shared commits against
+		// each file's own commit count, which the edge does not carry today.
+		if len(docs) > 3 {
+			continue
+		}
+		for docID, docPath := range docs {
+			if !changedFiles[docPath] {
+				addReason(docID, docsReason{Kind: "co_changes", Target: changedPath, Path: changedPath, Change: "changed"})
+			}
 		}
 	}
 

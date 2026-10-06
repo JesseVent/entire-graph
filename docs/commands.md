@@ -48,7 +48,7 @@ other query commands use; details are in the
 | `commit <ref>` | Entity-level change list for a commit vs its first parent, with heuristic dependent counts. |
 | `diff --base A --head B` | The same between two refs. `analyze` is an alias of `diff`. |
 | `checkpoint <id>` | Analyzes the commit behind an Entire-Checkpoint trailer. |
-| `docs` | Lists the Markdown sections the working tree's changes against HEAD probably made stale, with reasons: they name a changed or removed symbol, link to a changed section, or usually change with a changed file. Uses the experimental `X-entire-graph:MENTIONS` and `LINKS_TO` relations. |
+| `docs` | Lists the Markdown sections the working tree's changes against HEAD probably made stale, with reasons: they name a changed or removed symbol, link to a changed section, or usually change with a changed code file. Uses the experimental `X-entire-graph:MENTIONS` and `LINKS_TO` relations. |
 | `verify` | Runs a caller-provided test command and returns an adjudicated verdict. This executes the command you pass it; see [trust and security](trust-and-security.md). |
 
 ## Export
