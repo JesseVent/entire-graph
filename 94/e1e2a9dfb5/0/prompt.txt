@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bg26swghh</task-id>
+<tool-use-id>toolu_01GyfrsjNJh1VWLyrpjBoU1y</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jvent-Dev-entire-graph/01f054e8-f547-469c-9360-1e6ccad82720/tasks/bg26swghh.output</output-file>
+<status>completed</status>
+<summary>Background command "Poll trail 9 until the doc staleness monitor reports" completed (exit code 0)</summary>
+</task-notification>
