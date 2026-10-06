@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/entireio/entire-graph/internal/gitutil"
 	"github.com/entireio/entire-graph/internal/sem"
 	"github.com/entireio/entire-graph/internal/termsafe"
 )
@@ -21,12 +22,17 @@ type docsFlags struct {
 	Format   string
 	Limit    int
 	CacheDir string
+	// Base compares the merge base of this ref and HEAD, instead of HEAD, with
+	// the working tree, so a branch's commits are covered as well.
+	Base string
 }
 
 // docsResponse is the worklist `docs` prints: the doc sections an uncommitted
 // change probably made stale, one hop from what changed. It is a pointer for an
 // agent to read and update, not a verdict; the reasons say why each is listed.
 type docsResponse struct {
+	// BaseRef is --base when given; BaseCommit is then its merge base with HEAD.
+	BaseRef        string     `json:"base_ref,omitempty"`
 	BaseCommit     string     `json:"base_commit"`
 	ChangedFiles   int        `json:"changed_files"`
 	ChangedSymbols int        `json:"changed_symbols"`
@@ -40,6 +46,10 @@ type docsResponse struct {
 	Warnings        []sem.ProviderWarning `json:"warnings"`
 	PartialFailures []sem.PartialFailure  `json:"partial_failures"`
 	Stats           sem.ProviderStats     `json:"stats"`
+	// AffectingFailures are the PartialFailures that can hide a doc from Items:
+	// those in a changed file or a Markdown file. A failure elsewhere (a vendored
+	// header, a minified JSON file) cannot, so text output reports only these.
+	AffectingFailures []sem.PartialFailure `json:"affecting_failures"`
 }
 
 type docsItem struct {
@@ -72,22 +82,32 @@ func runDocs(ctx context.Context, opts Options, args []string) error {
 		return err
 	}
 	cacheDir := resolveCacheDir(flags.CacheDir, opts.Env.PluginDataDir)
-	load := func(worktree bool) (sem.ProviderSnapshot, error) {
+	load := func(worktree bool, revision string) (sem.ProviderSnapshot, error) {
 		snapshot, _, err := sem.LoadOrBuildProviderSnapshot(ctx, repo, opts.Version, sem.ProviderSnapshotOptions{
 			NoNetwork: true,
 			Worktree:  worktree,
+			Revision:  revision,
 			Profile:   sem.ProfileFull,
 		}, cacheDir, false)
 		return snapshot, err
 	}
-	base, err := load(false)
+	baseRevision := ""
+	if flags.Base != "" {
+		if err := sem.EnsureGitMetadataSafeForSubprocess(repo); err != nil {
+			return err
+		}
+		if baseRevision, err = gitutil.MergeBase(ctx, repo, flags.Base, "HEAD"); err != nil {
+			return err
+		}
+	}
+	base, err := load(false, baseRevision)
 	if err != nil {
 		return err
 	}
 	if base.Header.Commit == "" {
 		return errors.New("docs compares the working tree with HEAD, and this repository has no commits yet")
 	}
-	head, err := load(true)
+	head, err := load(true, "")
 	if err != nil {
 		return err
 	}
@@ -103,6 +123,7 @@ func runDocs(ctx context.Context, opts Options, args []string) error {
 		return err
 	}
 	response := buildDocsResponse(base, head, readBase, readHead, flags.Limit)
+	response.BaseRef = flags.Base
 	switch flags.Format {
 	case "json":
 		encoder := json.NewEncoder(termsafe.NewJSONWriter(opts.Stdout))
@@ -135,6 +156,8 @@ func parseDocsFlags(args []string) (docsFlags, error) {
 			flags.Format, err = value()
 		case "--cache-dir":
 			flags.CacheDir, err = value()
+		case "--base":
+			flags.Base, err = value()
 		case "--limit":
 			var raw string
 			if raw, err = value(); err == nil {
@@ -154,7 +177,7 @@ func parseDocsFlags(args []string) (docsFlags, error) {
 }
 
 // buildDocsResponse lists the doc sections that point, one hop, at something
-// the working tree changed relative to HEAD:
+// the working tree changed relative to the base snapshot (HEAD, or the --base merge base):
 //
 //   - a section that MENTIONS a changed or removed code symbol, or a removed file;
 //   - a section that LINKS_TO a changed or removed section, or a removed file;
@@ -199,6 +222,12 @@ func buildDocsResponse(base, head sem.ProviderSnapshot, readBase, readHead lineR
 		}
 	}
 	response.ChangedFiles = len(changedFiles)
+	response.AffectingFailures = []sem.PartialFailure{}
+	for _, failure := range response.PartialFailures {
+		if changedFiles[failure.FilePath] || failure.Language == "Markdown" || strings.HasSuffix(failure.FilePath, ".md") {
+			response.AffectingFailures = append(response.AffectingFailures, failure)
+		}
+	}
 	if len(changedFiles) == 0 {
 		return response
 	}
@@ -481,17 +510,29 @@ func writeDocsText(out io.Writer, response docsResponse) {
 	if len(commit) > 12 {
 		commit = commit[:12]
 	}
+	against := "HEAD (" + commit + ")"
+	if response.BaseRef != "" {
+		against = termsafe.Line(response.BaseRef) + " (merge base " + commit + ")"
+	}
 	if response.ChangedFiles == 0 {
-		fmt.Fprintf(out, "No changes against HEAD (%s).\n", commit)
+		fmt.Fprintf(out, "No changes against %s.\n", against)
 		return
 	}
-	writeScopedCompletenessBlock(out,
-		completenessScopeOrAll(completenessScope{}, response.Warnings, response.PartialFailures, response.Stats),
-		response.Warnings, response.PartialFailures, response.Stats)
+	if len(response.AffectingFailures) > 0 {
+		fmt.Fprintf(out, "Incomplete: %d changed or Markdown file%s failed to parse, so docs pointing at them may be missing:\n",
+			len(response.AffectingFailures), pluralSuffix(len(response.AffectingFailures)))
+		for i, failure := range response.AffectingFailures {
+			if i == 5 {
+				fmt.Fprintf(out, "- ... %d more; see --format json\n", len(response.AffectingFailures)-i)
+				break
+			}
+			fmt.Fprintf(out, "- %s: %s\n", failure.Code, termsafe.Line(failure.FilePath))
+		}
+	}
 	if len(response.Items) == 0 {
-		fmt.Fprintf(out, "No docs point at what changed against HEAD (%s): %d files, %d symbols.\n", commit, response.ChangedFiles, response.ChangedSymbols)
+		fmt.Fprintf(out, "No docs point at what changed against %s: %d files, %d symbols.\n", against, response.ChangedFiles, response.ChangedSymbols)
 	} else {
-		fmt.Fprintf(out, "Docs that may be stale after these changes against HEAD (%s). Update them in the same change:\n", commit)
+		fmt.Fprintf(out, "Docs that may be stale after these changes against %s. Update them in the same change:\n", against)
 	}
 	for _, item := range response.Items {
 		heading := "(file)"
