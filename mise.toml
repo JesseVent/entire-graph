@@ -10,10 +10,12 @@ run = "gofmt -s -w ."
 # there that makes `git commit` wait -- commit.gpgsign against a hardware key is
 # the one that bites -- is paid once per fixture commit. Neutering both files
 # took the dependents tests from 27s to 0.3s locally. CI never noticed: its
-# runners have no user config to inherit.
+# runners have no user config to inherit. /dev/null is not enough on its own:
+# Git still reads ~/.config/git/ignore when core.excludesFile is unset, so the
+# global file is scripts/test.gitconfig, which pins that fallback to nothing.
 [tasks.test]
 description = "Run tests"
-env = { GIT_CONFIG_GLOBAL = "/dev/null", GIT_CONFIG_SYSTEM = "/dev/null" }
+env = { GIT_CONFIG_GLOBAL = "{{config_root}}/scripts/test.gitconfig", GIT_CONFIG_SYSTEM = "/dev/null" }
 run = "go test -timeout 30m ./..."
 
 [tasks.vet]
@@ -22,7 +24,7 @@ run = "go vet ./..."
 
 [tasks."test:ci"]
 description = "Run tests with race detection"
-env = { GIT_CONFIG_GLOBAL = "/dev/null", GIT_CONFIG_SYSTEM = "/dev/null" }
+env = { GIT_CONFIG_GLOBAL = "{{config_root}}/scripts/test.gitconfig", GIT_CONFIG_SYSTEM = "/dev/null" }
 run = "go test -race -timeout 30m ./..."
 
 [tasks."test:statusline"]
