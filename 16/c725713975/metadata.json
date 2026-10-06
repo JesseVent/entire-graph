@@ -1,0 +1,24 @@
+{
+  "cli_version": "0.11.4-nightly.202610050640.3299a0f9d",
+  "checkpoint_id": "16c725713975",
+  "strategy": "manual-commit",
+  "branch": "feat/markdown-doc-relations",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/16/c725713975/0/metadata.json",
+      "transcript": "/16/c725713975/0/full.jsonl",
+      "compact_transcript": "/16/c725713975/0/transcript.jsonl",
+      "content_hash": "/16/c725713975/0/content_hash.txt",
+      "prompt": "/16/c725713975/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 332,
+    "cache_creation_tokens": 557034,
+    "cache_read_tokens": 38260244,
+    "output_tokens": 139633,
+    "api_call_count": 166
+  }
+}
