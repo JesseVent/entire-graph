@@ -270,43 +270,51 @@ func githubAnchorSlug(heading string) string {
 
 // markdownCodeSpans returns a line's inline code spans and the line with those
 // spans blanked, so a link written inside backticks is not read as a link. A
-// span closes on a backtick run of the same length; an unmatched run is literal.
+// span closes on the next backtick run of the same length; an unmatched run is
+// literal.
+//
+// The line is repository content and may be megabytes long, so the closing run
+// is found through a per-width cursor over the runs rather than by rescanning
+// the rest of the line from every opener: a line of unmatched runs of widths
+// 1, 2, 3, ... would make the rescan quadratic. Each cursor only moves forward,
+// so the whole line costs time linear in its length.
 func markdownCodeSpans(line string) ([]string, string) {
-	var spans []string
-	prose := []byte(line)
+	type backtickRun struct{ start, width int }
+	var runs []backtickRun
+	runsByWidth := map[int][]int{}
 	for i := 0; i < len(line); {
 		if line[i] != '`' {
 			i++
 			continue
 		}
-		open := i
+		start := i
 		for i < len(line) && line[i] == '`' {
 			i++
 		}
-		width := i - open
-		closeAt := -1
-		for j := i; j < len(line); {
-			if line[j] != '`' {
-				j++
-				continue
-			}
-			run := j
-			for j < len(line) && line[j] == '`' {
-				j++
-			}
-			if j-run == width {
-				closeAt = run
-				break
-			}
+		runsByWidth[i-start] = append(runsByWidth[i-start], len(runs))
+		runs = append(runs, backtickRun{start: start, width: i - start})
+	}
+	var spans []string
+	prose := []byte(line)
+	cursor := map[int]int{}
+	for index := 0; index < len(runs); {
+		open := runs[index]
+		sameWidth := runsByWidth[open.width]
+		next := cursor[open.width]
+		for next < len(sameWidth) && sameWidth[next] <= index {
+			next++
 		}
-		if closeAt < 0 {
+		cursor[open.width] = next
+		if next == len(sameWidth) {
+			index++
 			continue
 		}
-		spans = append(spans, strings.TrimSpace(line[i:closeAt]))
-		for p := open; p < closeAt+width; p++ {
+		closing := runs[sameWidth[next]]
+		spans = append(spans, strings.TrimSpace(line[open.start+open.width:closing.start]))
+		for p := open.start; p < closing.start+closing.width; p++ {
 			prose[p] = ' '
 		}
-		i = closeAt + width
+		index = sameWidth[next] + 1
 	}
 	return spans, string(prose)
 }

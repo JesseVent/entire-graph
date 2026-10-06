@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestMarkdownRelationsMentionAndLinkTheirTargets(t *testing.T) {
@@ -89,5 +90,43 @@ func TestGitHubAnchorSlug(t *testing.T) {
 		if got := githubAnchorSlug(heading); got != want {
 			t.Errorf("githubAnchorSlug(%q) = %q, want %q", heading, got, want)
 		}
+	}
+}
+
+func TestMarkdownCodeSpans(t *testing.T) {
+	spans, prose := markdownCodeSpans("`a` then ``b`c`` then ``` x ``` and `unclosed [l](p)")
+	if got := strings.Join(spans, "|"); got != "a|b`c|x" {
+		t.Errorf("spans = %q, want %q", got, "a|b`c|x")
+	}
+	// Each span, delimiters included, is blanked in place (3, 7 and 9 bytes),
+	// between the single spaces that already surround it.
+	if want := "    then" + strings.Repeat(" ", 9) + "then" + strings.Repeat(" ", 11) + "and `unclosed [l](p)"; prose != want {
+		t.Errorf("prose = %q, want %q", prose, want)
+	}
+}
+
+// A line of unmatched backtick runs of widths 1, 2, 3, ... is the worst case
+// for a scanner that searches the rest of the line from every opener. The line
+// is repository content, so it must cost linear time, not quadratic. On this
+// 8 MB line the linear scan takes ~10ms; the quadratic one took ~6s, so the 2s
+// deadline separates them with room for a slow or race-instrumented runner.
+func TestMarkdownCodeSpansUnmatchedRunsAreLinear(t *testing.T) {
+	var line strings.Builder
+	for width := 1; width <= 4000; width++ {
+		line.WriteString(strings.Repeat("`", width))
+		line.WriteByte('x')
+	}
+	done := make(chan []string, 1)
+	go func() {
+		spans, _ := markdownCodeSpans(line.String())
+		done <- spans
+	}()
+	select {
+	case spans := <-done:
+		if len(spans) != 0 {
+			t.Fatalf("unmatched runs produced %d spans", len(spans))
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("markdownCodeSpans on an %d-byte line of unmatched runs did not finish in 2s", line.Len())
 	}
 }
