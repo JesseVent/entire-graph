@@ -67,6 +67,14 @@ func markdownRelations(repoKey string, recordsByFile map[string][]SymbolRecord, 
 		seen[key] = true
 		relations = append(relations, relation)
 	}
+	// Resolution scans every same-named definition, and a document is free to
+	// repeat a span thousands of times, so each distinct span resolves once.
+	type mentionTarget struct {
+		toID, targetKind, resolution string
+		confidence                   float64
+		ok                           bool
+	}
+	mentionTargets := map[string]mentionTarget{}
 	for _, docPath := range paths {
 		content, ok := readContent(docPath)
 		if !ok {
@@ -93,11 +101,15 @@ func markdownRelations(repoKey string, recordsByFile map[string][]SymbolRecord, 
 			spans, prose := markdownCodeSpans(line)
 			if spec.emits(MarkdownMentionsRelation) {
 				for _, span := range spans {
-					toID, targetKind, resolution, confidence, ok := markdownMentionTarget(repoKey, span, knownFiles, symbolsByShortName)
-					if !ok {
+					target, resolved := mentionTargets[span]
+					if !resolved {
+						target.toID, target.targetKind, target.resolution, target.confidence, target.ok = markdownMentionTarget(repoKey, span, knownFiles, symbolsByShortName)
+						mentionTargets[span] = target
+					}
+					if !target.ok {
 						continue
 					}
-					add(markdownRelation(from, toID, MarkdownMentionsRelation, confidence, "Markdown names this in inline code", resolution, targetKind, "inline_code", docPath, lineNumber, span))
+					add(markdownRelation(from, target.toID, MarkdownMentionsRelation, target.confidence, "Markdown names this in inline code", target.resolution, target.targetKind, "inline_code", docPath, lineNumber, span))
 				}
 			}
 			if spec.emits(MarkdownLinksToRelation) {
