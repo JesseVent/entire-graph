@@ -85,7 +85,8 @@ A named file answers where code is; it does not answer what else depends on it.
 Do not skip the query on the grounds that the available context feels sufficient.
 Then reuse the reported locations and inspect source. Use Graph query, def, neighbors,
 and impact for further discovery and structural analysis. Use Graph diff, commit, and
-checkpoint for semantic comparisons of code revisions.
+checkpoint for semantic comparisons of code revisions. After changing code or docs, run
+` + "`entire graph docs --repo .`" + ` and update the doc sections it lists in the same change.
 Graph interactive queries normally inspect the working tree; --head selects committed
 source. Static relations can be incomplete, so verify against source.
 `
@@ -126,8 +127,9 @@ and it holds when a Brain brief has already reported locations: a brief reports
 where code is, not what depends on it. A Graph query after a brief is not redundant.
 Use Graph query, def, neighbors, and impact for code discovery and structural
 analysis. Use Graph diff, commit, and checkpoint for semantic comparisons of code
-revisions. Graph interactive queries normally inspect the working tree; Brain
-semantic answers refer to a stored index.
+revisions. After changing code or docs, run ` + "`entire graph docs --repo .`" + ` and update
+the doc sections it lists in the same change. Graph interactive queries normally
+inspect the working tree; Brain semantic answers refer to a stored index.
 Do not ask both tools the same question without an identified gap.
 
 ` + brainWorkflow

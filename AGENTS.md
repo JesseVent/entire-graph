@@ -114,6 +114,15 @@ entire graph checkpoint <id> --json                 # the commit behind an Entir
 
 **When:** judging whether a change is safe to keep / revert / continue, or reviewing a branch/PR. High dependent counts on a signature change = run tests first.
 
+### 📝 docs — *which docs did this change make stale?*
+Compares the working tree with HEAD and lists Markdown sections that point, one hop, at what changed: sections that name a changed or removed symbol in inline code (or a removed file by path), sections that link to a changed section or a removed file, and Markdown files that usually change with a changed file but were not touched. Sections the change already edited are counted, not listed. Built on the experimental `X-entire-graph:MENTIONS` / `LINKS_TO` relations, so a doc that restates a fact without naming it is not found.
+
+```sh
+entire graph docs --repo . [--format text|json] [--limit 50]
+```
+
+**When:** after changing code or docs, before you stop: update the sections it lists in the same change.
+
 ### 🏗️ index — *build / warm one cache variant*
 Prebuilds a durable, complete committed-tree snapshot and verifies it was
 written before latency-sensitive work. Reuse is cache-variant-specific: a
@@ -198,6 +207,7 @@ locate  →  entire graph query --query "..."          (ranked code + file:line)
 impact  →  entire graph impact --symbol X              (one-shot blast radius: callers, types, data flow, co-change)
 callers →  entire graph neighbors --symbol X ...       (targeted callers/callees of X)
 change  →  entire graph diff --base A --head B          (entity-level, with dependents)
+docs    →  entire graph docs --repo .                  (doc sections your uncommitted change made stale)
 ingest  →  entire graph snapshot --format ndjson        (whole graph)
 report  →  entire graph stats --repo .                  (human-facing: graph vs grep/read usage + estimated token savings)
 ```

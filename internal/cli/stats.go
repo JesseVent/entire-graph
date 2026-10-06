@@ -81,7 +81,7 @@ var graphVerbs = map[string]bool{
 	"query": true, "search": true, "neighbors": true, "impact": true, "diff": true, "commit": true,
 	"checkpoint": true, "analyze": true, "doctor": true, "capabilities": true,
 	"snapshot": true, "snapshot-query": true, "symbols": true, "edges": true, "index": true,
-	"stats": true, "def": true, "explain": true, "verify": true, "health": true,
+	"stats": true, "def": true, "explain": true, "verify": true, "health": true, "docs": true,
 	"agent-guide": true, "init-agents": true, "version": true, "help": true,
 }
 
