@@ -97,7 +97,7 @@ func (index *CompactSnapshotIndex) Query(query CompactSnapshotQuery) CompactSnap
 	}
 	for _, position := range index.relationsByFrom[query.FromID] {
 		relation := index.Snapshot.Relations[position]
-		if query.Relation != "" && relation.Type != strings.ToUpper(query.Relation) {
+		if query.Relation != "" && !strings.EqualFold(relation.Type, query.Relation) {
 			continue
 		}
 		result.Relations = append(result.Relations, relation)
