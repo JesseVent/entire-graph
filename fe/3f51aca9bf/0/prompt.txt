@@ -1,0 +1,9 @@
+how do i follow the contributors guidelines and actually raise a feature
+
+---
+
+i want to just do it into my own repo and then put it in their discord
+
+---
+
+did you document the PR

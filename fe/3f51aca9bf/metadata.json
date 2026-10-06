@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.11.4-nightly.202610050640.3299a0f9d",
+  "checkpoint_id": "fe3f51aca9bf",
+  "strategy": "manual-commit",
+  "branch": "feat/docs-worklist",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "internal/cli/docs.go",
+    "internal/cli/docs_test.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/fe/3f51aca9bf/0/metadata.json",
+      "transcript": "/fe/3f51aca9bf/0/full.jsonl",
+      "compact_transcript": "/fe/3f51aca9bf/0/transcript.jsonl",
+      "content_hash": "/fe/3f51aca9bf/0/content_hash.txt",
+      "prompt": "/fe/3f51aca9bf/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 558,
+    "cache_creation_tokens": 776867,
+    "cache_read_tokens": 70406417,
+    "output_tokens": 239994,
+    "api_call_count": 279
+  }
+}
