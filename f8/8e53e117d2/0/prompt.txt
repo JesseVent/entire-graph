@@ -1,0 +1,43 @@
+push and then merge into my fork
+
+---
+
+could you draft a feature issuue
+
+---
+
+can you create the isue with feat:
+
+---
+
+summarise in two sentences
+
+---
+
+can i create a trails for it also?
+
+---
+
+i need runners for it
+
+---
+
+entire trail delete 5.
+
+---
+
+<task-notification>
+<task-id>b84pftf9h</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jvent-Dev-entire-graph/01f054e8-f547-469c-9360-1e6ccad82720/tasks/b84pftf9h.output</output-file>
+<status>completed</status>
+<summary>Background command "Poll trail 6 until runner findings arrive" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+The trail's runners won't catch stale docs: the "Drift" runner checks code patterns, and `graph docs` only sees uncommitted edits.
+
+---
+
+we need a docs init or somehing for fresh s tarters
