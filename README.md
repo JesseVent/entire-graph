@@ -129,6 +129,7 @@ automation. See the [command reference](docs/commands.md).
 | Trace callers or callees | What calls `ResolveRoute`? | `neighbors` |
 | Check the blast radius | What would changing `ResolveRoute` affect? | `impact` |
 | Review a branch | Summarize the semantic changes from `main` to `HEAD`. | `diff` |
+| Keep docs current | Which docs did my change make stale? | `docs` |
 | Export the full graph | Export the repository graph as NDJSON. | `snapshot` |
 | Inspect indexing health | Show parser coverage and affected files, including healthy results. | `health` |
 

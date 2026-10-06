@@ -389,6 +389,21 @@ var commandDocs = []commandDoc{
 		examples: []string{"entire graph checkpoint abc123 --json"},
 	},
 	{
+		name:    "docs",
+		group:   groupAnalyze,
+		summary: "Docs your uncommitted changes probably made stale",
+		usage:   []string{"entire graph docs [--repo path] [--format text|json] [--limit 50]"},
+		long: "Compares the working tree with HEAD and lists the Markdown sections that point, one hop, at what changed: sections that name a changed or removed symbol, or a removed file, in inline code; sections that link to a changed section or a removed file; and Markdown files that usually change with a changed code file but were not touched. Sections the change already edited are counted, not listed. Run it after changing code or docs and update the sections it lists in the same change.\n\n" +
+			"Mentions and links are the experimental X-entire-graph:MENTIONS and X-entire-graph:LINKS_TO relations, so a name used in a doc only lexically, or a section that restates a fact without naming it, is not found. Builds the full-profile HEAD snapshot (cached) and the working-tree snapshot.",
+		flags: []flagDoc{
+			{name: "--repo", arg: "path", desc: "Repository (default: current repo)"},
+			{name: "--format", arg: "text|json", def: "text", desc: "Output format"},
+			{name: "--limit", arg: "n", def: "50", desc: "Max doc sections listed"},
+			{name: "--cache-dir", arg: "path", desc: "Override the shared index cache directory"},
+		},
+		examples: []string{"entire graph docs --repo ."},
+	},
+	{
 		name:    "verify",
 		group:   groupAnalyze,
 		summary: "Run a test command and return an adjudicated verdict, not test output",
