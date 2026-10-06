@@ -617,7 +617,9 @@ func neighborRelationMatches(requested, actual string) bool {
 	// Constructors are callable dependencies. The provider schema keeps
 	// CONSTRUCTS distinct, while the focused call-neighborhood view includes
 	// them so "callees" does not silently omit direct constructor invocations.
-	return actual == requested || (requested == "CALLS" && actual == "CONSTRUCTS")
+	// The flag is upper-cased on parse, so extension types such as
+	// X-entire-graph:MENTIONS only match case-insensitively.
+	return strings.EqualFold(actual, requested) || (requested == "CALLS" && actual == "CONSTRUCTS")
 }
 
 func endpointForExternal(external sem.ExternalRecord) neighborEndpoint {

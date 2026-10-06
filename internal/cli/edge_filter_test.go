@@ -57,6 +57,23 @@ func TestRelationMatches(t *testing.T) {
 	}
 }
 
+// Relation flags are upper-cased on parse, so an extension type such as
+// X-entire-graph:MENTIONS only matches when the comparison ignores case.
+func TestExtensionRelationTypesMatchCaseInsensitively(t *testing.T) {
+	mention := sem.RelationRecord{
+		FromID: "gh/o/r:Markdown:README.md:section:Guide",
+		ToID:   "gh/o/r:Go:b.go:function:Callee",
+		Type:   sem.MarkdownMentionsRelation,
+	}
+	requested := strings.ToUpper(sem.MarkdownMentionsRelation)
+	if !neighborRelationMatches(requested, mention.Type) {
+		t.Errorf("neighbors --relation %s did not match %s", requested, mention.Type)
+	}
+	if !relationMatches(mention, providerFlags{Relation: []string{requested}}) {
+		t.Errorf("edges --relation %s did not match %s", requested, mention.Type)
+	}
+}
+
 func TestWarnIfPartial(t *testing.T) {
 	ok := &sem.SnapshotSummary{Stats: sem.ProviderStats{CompletenessLevel: "ok", Files: 10, ParsedFiles: 10}}
 	var b strings.Builder

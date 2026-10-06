@@ -589,6 +589,10 @@ var goldenFixtures = []string{
 	// the capability matrix under-reported (Zig, C, Kotlin, Ruby): each emits
 	// call, type and data-flow edges the matrix did not declare.
 	"multilang-relations",
+	// docs-mentions is the only fixture with Markdown prose: its sections name
+	// Go symbols and files in inline code and link to each other, so the
+	// experimental X-entire-graph:MENTIONS / LINKS_TO edges have a baseline.
+	"docs-mentions",
 	"csharp-fields",
 	"csharp-oo",
 	"go-basic",

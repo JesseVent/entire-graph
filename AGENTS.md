@@ -77,7 +77,7 @@ entire graph symbols --repo . --format ndjson [--worktree]
 **When:** you need the complete definition inventory (e.g. ingesting into a store), not a single lookup.
 
 ### 🔗 edges — *relations*
-Full stream of relation records across all 30 types (`CALLS`, `IMPORTS`, `EXTENDS`, `HANDLES_ROUTE`, …), each tagged with resolution and confidence. The stream is whole-repo by default; `--to`, `--from`, and `--relation` filter it server-side. For one symbol's callers/callees, prefer `neighbors` because it annotates resolved definitions and call sites from source.
+Full stream of relation records across all 30 core types (`CALLS`, `IMPORTS`, `EXTENDS`, `HANDLES_ROUTE`, …) plus the experimental Markdown types `X-entire-graph:MENTIONS` (a doc section names a symbol or file in inline code) and `X-entire-graph:LINKS_TO` (a doc section links to a file or section), each tagged with resolution and confidence. The stream is whole-repo by default; `--to`, `--from`, and `--relation` filter it server-side. For one symbol's callers/callees, prefer `neighbors` because it annotates resolved definitions and call sites from source.
 
 ```sh
 entire graph edges --repo . --format ndjson [--worktree] [--to ID|NAME] [--from ID|NAME] [--relation TYPE[,TYPE...]]
