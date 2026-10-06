@@ -3733,22 +3733,33 @@ func makeEntities(content string) []Entity {
 
 var (
 	markdownEntitiesHeadingRe = regexp.MustCompile(`^(#{1,6})\s+(.+)$`)
-	markdownEntitiesFenceRe   = regexp.MustCompile("^```\\s*([A-Za-z0-9_+-]*)")
+	markdownEntitiesFenceRe   = regexp.MustCompile("^(```+|~~~+)\\s*([A-Za-z0-9_+-]*)")
 )
 
+// markdownEntities emits a section per heading and a code_fence per fence. Lines
+// inside a fence are code, not Markdown: a `# comment` in a shell fence is not a
+// heading, and the closing fence is not a second fence. An unclosed fence runs
+// to the end of the document, as CommonMark specifies.
 func markdownEntities(content string) []Entity {
 	lines := strings.Split(content, "\n")
 	var entities []Entity
 	fenceIndex := 0
+	openFence := ""
 	for i, line := range lines {
+		if openFence != "" {
+			if markdownFenceCloses(line, openFence) {
+				openFence = ""
+			}
+			continue
+		}
 		if match := markdownEntitiesHeadingRe.FindStringSubmatch(line); match != nil {
 			name := strings.TrimSpace(strings.Trim(match[2], "#"))
 			entities = append(entities, simpleFallbackEntity("section", slugName(name), "markdown heading "+name, i+1, i+1, strings.TrimSpace(line)))
 			continue
 		}
-		if match := markdownEntitiesFenceRe.FindStringSubmatch(line); match != nil {
+		if marker, lang, ok := markdownFenceOpens(line); ok {
+			openFence = marker
 			fenceIndex++
-			lang := match[1]
 			if lang == "" {
 				lang = "text"
 			}
@@ -3757,6 +3768,25 @@ func markdownEntities(content string) []Entity {
 		}
 	}
 	return entities
+}
+
+// markdownFenceOpens reports whether line opens a code fence, returning its
+// marker run and info-string language. A backtick fence's info string cannot
+// itself hold a backtick, so "```x```" is inline code at the start of a line,
+// not a fence that swallows the rest of the document.
+func markdownFenceOpens(line string) (marker, lang string, ok bool) {
+	match := markdownEntitiesFenceRe.FindStringSubmatch(line)
+	if match == nil || match[1][0] == '`' && strings.Contains(line[len(match[1]):], "`") {
+		return "", "", false
+	}
+	return match[1], match[2], true
+}
+
+// markdownFenceCloses reports whether line closes a fence opened by marker: a run
+// of the same character at least as long, with nothing else on the line.
+func markdownFenceCloses(line, marker string) bool {
+	trimmed := strings.TrimSpace(line)
+	return len(trimmed) >= len(marker) && strings.Trim(trimmed, marker[:1]) == ""
 }
 
 var htmlEntitiesIdRe = regexp.MustCompile(`\bid\s*=\s*["']([^"']+)["']`)

@@ -1,13 +1,14 @@
 package sem
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
 
 func TestParserIdentityRevisionsSnapshotAndCaches(t *testing.T) {
 	header := leanHeader(sourceContext{}, "same-release", profileSpec{})
-	if header.IdentityRevision != "3" {
+	if header.IdentityRevision != "4" {
 		t.Fatalf("identity=%q", header.IdentityRevision)
 	}
 	if !strings.HasSuffix(searchSnapshotCacheVersion, "-"+header.IdentityRevision) || !strings.HasSuffix(providerRecordsCacheVersion, "-"+header.IdentityRevision) {
@@ -53,5 +54,41 @@ func TestPythonNestedCallableCorrectionIsRevisioned(t *testing.T) {
 	}
 	if IdentityRevision == "2" {
 		t.Fatal("Python nested-callable correction must invalidate the previous parser revision")
+	}
+}
+
+// Fence tracking removes phantom sections (headings inside fences) and phantom
+// closing fences, which renumbers later code_fence_N names: a re-key.
+func TestMarkdownFenceCorrectionIsRevisioned(t *testing.T) {
+	content := strings.Join([]string{
+		"# Title",
+		"```bash",
+		"# not a heading",
+		"```",
+		"## Real",
+		"~~~python",
+		"## also not a heading",
+		"```",
+		"~~~",
+		"```text``` is inline code, not a fence",
+		"```",
+		"# swallowed by the unclosed fence",
+	}, "\n")
+	var got []string
+	for _, entity := range markdownEntities(content) {
+		got = append(got, fmt.Sprintf("%s:%s@%d", entity.Kind, entity.Name, entity.StartLine))
+	}
+	want := []string{
+		"section:Title@1",
+		"code_fence:code_fence_1_bash@2",
+		"section:Real@5",
+		"code_fence:code_fence_2_python@6",
+		"code_fence:code_fence_3_text@11",
+	}
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Fatalf("markdown entities =\n  %s\nwant\n  %s", strings.Join(got, "\n  "), strings.Join(want, "\n  "))
+	}
+	if IdentityRevision == "3" {
+		t.Fatal("Markdown fence correction must invalidate the previous parser revision")
 	}
 }
