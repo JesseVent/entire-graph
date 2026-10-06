@@ -351,3 +351,236 @@ func markdownFenceLines(lines []string) []bool {
 	}
 	return inFence
 }
+
+// MarkdownProblem is a reference in a Markdown doc that no longer resolves: a
+// link to a missing doc or heading, or inline code naming a repository path or
+// a qualified name that no longer exists. `docs init` reports these as the
+// drift a repository already has.
+type MarkdownProblem struct {
+	// Kind is "broken_link", "missing_anchor", "stale_path" or "stale_name".
+	Kind   string `json:"kind"`
+	Path   string `json:"path"`
+	Line   int    `json:"line"`
+	Target string `json:"target"`
+	Detail string `json:"detail"`
+}
+
+// MarkdownReferenceProblems finds the references in the snapshot's Markdown
+// files that no longer resolve. It reports only cases it can decide: a name is
+// checked only when its qualifier is a package or type of this repository, and
+// a link only when it points at a doc (a .md file or an extensionless path), so
+// external names and links to images are never reported. readLines reads a
+// file of the same tree, and is also what decides that a path missing from the
+// snapshot (ignored, or never indexed) still exists.
+//
+// A missing path in inline code is reported only when removedPaths says the
+// repository once had it, because docs also name example paths that never
+// existed (a `.github/workflows/ci.yml` given as an illustration). A nil
+// removedPaths reports no stale paths.
+func MarkdownReferenceProblems(snapshot ProviderSnapshot, readLines func(string) ([]string, bool), removedPaths func([]string) map[string]bool) []MarkdownProblem {
+	knownFiles, knownDirs, topDirs, fileNames := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
+	for _, file := range snapshot.Files {
+		knownFiles[file.Path] = true
+		fileNames[path.Base(file.Path)] = true
+		if ext := path.Ext(file.Path); ext != "" {
+			fileNames["*"+strings.ToLower(ext)] = true
+		}
+		for dir := path.Dir(file.Path); dir != "."; dir = path.Dir(dir) {
+			knownDirs[dir] = true
+		}
+		if first, _, nested := strings.Cut(file.Path, "/"); nested {
+			topDirs[first] = true
+		}
+	}
+	recordsByFile := map[string][]SymbolRecord{}
+	codeByShortName := map[string][]SymbolRecord{}
+	qualifiers := map[string]bool{} // package directory base names and types with members
+	for _, symbol := range snapshot.Symbols {
+		recordsByFile[symbol.FilePath] = append(recordsByFile[symbol.FilePath], symbol)
+		// Test fixtures define stand-ins for other projects' code (a `Router`
+		// for a gorilla/mux example), so their names say nothing about what a
+		// doc's `Router.Match` should resolve to.
+		if symbol.Language == "Markdown" || strings.Contains("/"+symbol.FilePath, "/testdata/") {
+			continue
+		}
+		codeByShortName[symbol.Name] = append(codeByShortName[symbol.Name], symbol)
+		qualifiers[path.Base(path.Dir(symbol.FilePath))] = true
+		// The segment before the last dot of a qualified name is the type (or
+		// package) that owns it: `pkg.Type.Method` makes Type a qualifier.
+		if dot := strings.LastIndex(symbol.QualifiedName, "."); dot > 0 {
+			owner := symbol.QualifiedName[:dot]
+			qualifiers[owner[strings.LastIndex(owner, ".")+1:]] = true
+		}
+	}
+	exists := func(file string) bool {
+		if knownFiles[file] || knownDirs[file] {
+			return true
+		}
+		_, ok := readLines(file)
+		return ok
+	}
+	anchorsByFile := map[string]map[string]string{}
+	anchors := func(file string) map[string]string {
+		if found, ok := anchorsByFile[file]; ok {
+			return found
+		}
+		found := markdownSectionAnchors(recordsByFile[file])
+		anchorsByFile[file] = found
+		return found
+	}
+
+	var paths []string
+	for _, file := range snapshot.Files {
+		if file.Language == "Markdown" && !MarkdownHistoricalDoc(file.Path) {
+			paths = append(paths, file.Path)
+		}
+	}
+	sort.Strings(paths)
+	var problems []MarkdownProblem
+	seen := map[string]bool{}
+	report := func(problem MarkdownProblem) {
+		key := problem.Path + "\x00" + strconv.Itoa(problem.Line) + "\x00" + problem.Target
+		if !seen[key] {
+			seen[key] = true
+			problems = append(problems, problem)
+		}
+	}
+	for _, docPath := range paths {
+		lines, ok := readLines(docPath)
+		if !ok {
+			continue
+		}
+		inFence := markdownFenceLines(lines)
+		for index, line := range lines {
+			if inFence[index] {
+				continue
+			}
+			lineNumber := index + 1
+			spans, prose := markdownCodeSpans(line)
+			for _, span := range spans {
+				if problem, stale := markdownStaleSpan(span, topDirs, qualifiers, fileNames, codeByShortName, exists); stale {
+					problem.Path, problem.Line = docPath, lineNumber
+					report(problem)
+				}
+			}
+			for _, match := range markdownLinkRe.FindAllStringSubmatch(prose, -1) {
+				if match[1] == "!" {
+					continue
+				}
+				if problem, broken := markdownBrokenLink(docPath, match[2], exists, anchors); broken {
+					problem.Path, problem.Line = docPath, lineNumber
+					report(problem)
+				}
+			}
+		}
+	}
+	var candidates []string
+	for _, problem := range problems {
+		if problem.Kind == "stale_path" {
+			candidates = append(candidates, markdownSpanPath(problem.Target))
+		}
+	}
+	removed := map[string]bool{}
+	if removedPaths != nil && len(candidates) > 0 {
+		removed = removedPaths(candidates)
+	}
+	kept := problems[:0]
+	for _, problem := range problems {
+		if problem.Kind != "stale_path" || removed[markdownSpanPath(problem.Target)] {
+			kept = append(kept, problem)
+		}
+	}
+	return kept
+}
+
+// markdownSpanPath is the repository path an inline code span names, without a
+// leading ./ or a trailing :line.
+func markdownSpanPath(span string) string {
+	file, _, _ := strings.Cut(strings.TrimPrefix(span, "./"), ":")
+	return path.Clean(file)
+}
+
+// markdownStaleSpan decides whether an inline code span names a repository path
+// or a qualified name that no longer exists. fileNames holds the base names of
+// the repository's files and their extensions (as "*.ext"), so `go.mod` or
+// `config.json` reads as a file name, not as member `mod` of a package `go`.
+func markdownStaleSpan(span string, topDirs, qualifiers, fileNames map[string]bool, codeByShortName map[string][]SymbolRecord, exists func(string) bool) (MarkdownProblem, bool) {
+	if file := markdownSpanPath(span); strings.Contains(file, "/") && path.Ext(file) != "" {
+		// A placeholder or glob (`internal/sem/<lang>.go`, `docs/*.md`) is a
+		// pattern, not a path.
+		if strings.ContainsAny(file, " *?[]{}<>$~") {
+			return MarkdownProblem{}, false
+		}
+		if first, _, _ := strings.Cut(file, "/"); topDirs[first] && !exists(file) {
+			return MarkdownProblem{Kind: "stale_path", Target: span, Detail: "deleted from the repository"}, true
+		}
+		return MarkdownProblem{}, false
+	}
+	name, _ := strings.CutSuffix(span, "()")
+	qualifier, short, qualified := strings.Cut(name, ".")
+	if !qualified || strings.Contains(short, ".") || !markdownMentionIdentRe.MatchString(name) ||
+		!qualifiers[qualifier] || fileNames[span] || fileNames["*."+strings.ToLower(short)] {
+		return MarkdownProblem{}, false
+	}
+	for _, symbol := range codeByShortName[short] {
+		if symbol.QualifiedName == name || strings.HasSuffix(symbol.QualifiedName, "."+name) || path.Base(path.Dir(symbol.FilePath)) == qualifier {
+			return MarkdownProblem{}, false
+		}
+	}
+	return MarkdownProblem{Kind: "stale_name", Target: span, Detail: "no " + short + " in " + qualifier}, true
+}
+
+// markdownBrokenLink decides whether a Markdown link points at a doc or heading
+// that does not exist. Links to other kinds of file (images, PDFs) are left
+// alone, since those files may exist without being indexed.
+func markdownBrokenLink(docPath, target string, exists func(string) bool, anchors func(string) map[string]string) (MarkdownProblem, bool) {
+	if markdownLinkSchemeRe.MatchString(target) || strings.HasPrefix(target, "//") {
+		return MarkdownProblem{}, false
+	}
+	rawPath, anchor, _ := strings.Cut(target, "#")
+	if unescaped, err := url.PathUnescape(rawPath); err == nil {
+		rawPath = unescaped
+	}
+	file := docPath
+	switch {
+	case rawPath == "":
+	case strings.HasPrefix(rawPath, "/"):
+		file = path.Clean(strings.TrimPrefix(rawPath, "/"))
+	default:
+		file = path.Clean(path.Join(path.Dir(docPath), rawPath))
+	}
+	if file == "." || file == ".." || strings.HasPrefix(file, "../") {
+		return MarkdownProblem{}, false
+	}
+	ext := strings.ToLower(path.Ext(file))
+	if !exists(file) {
+		if ext == ".md" || ext == "" {
+			return MarkdownProblem{Kind: "broken_link", Target: target, Detail: "no such file " + file}, true
+		}
+		return MarkdownProblem{}, false
+	}
+	// A target with no parsed sections (oversized, or not Markdown) has no
+	// anchors to check against.
+	if anchor == "" || ext != ".md" || len(anchors(file)) == 0 {
+		return MarkdownProblem{}, false
+	}
+	if unescaped, err := url.PathUnescape(anchor); err == nil {
+		anchor = unescaped
+	}
+	if _, found := anchors(file)[strings.ToLower(anchor)]; !found {
+		return MarkdownProblem{Kind: "missing_anchor", Target: target, Detail: "no heading for #" + anchor + " in " + file}, true
+	}
+	return MarkdownProblem{}, false
+}
+
+// MarkdownHistoricalDoc reports whether a doc records the past, so a reference
+// in it that no longer resolves is history rather than drift: anything under
+// an `archive` or `history` directory, and changelogs.
+func MarkdownHistoricalDoc(docPath string) bool {
+	for _, dir := range strings.Split(path.Dir(docPath), "/") {
+		if dir == "archive" || dir == "history" {
+			return true
+		}
+	}
+	return strings.HasPrefix(strings.ToUpper(path.Base(docPath)), "CHANGELOG")
+}

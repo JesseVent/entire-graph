@@ -44,7 +44,7 @@ Every verb follows one path: `cmd/entire-graph/main.go` → `cli.Run` (one `swit
 | `def`, `explain`, `neighbors`, `impact` | `LoadOrBuildProviderSnapshot` (`search_cache.go`), then in-memory lookups |
 | `index` | `PreindexProviderSnapshot` (`search_cache.go`) |
 | `diff` / `analyze`, `commit`, `checkpoint` | `AnalyzeGitRangeWithOptions` / `AnalyzeCheckpoint` (`analyze.go`) |
-| `docs` | Two `LoadOrBuildProviderSnapshot` calls (HEAD, or with `--base` the merge base via `ProviderSnapshotOptions.Revision`, and the working tree), compared in `buildDocsResponse` (`internal/cli/docs.go`) over the `X-entire-graph:MENTIONS`/`LINKS_TO` edges from `markdown_relations.go` |
+| `docs` | Two `LoadOrBuildProviderSnapshot` calls (HEAD, or with `--base` the merge base via `ProviderSnapshotOptions.Revision`, and the working tree), compared in `buildDocsResponse` (`internal/cli/docs.go`) over the `X-entire-graph:MENTIONS`/`LINKS_TO` edges from `markdown_relations.go`. `docs init` audits one working-tree snapshot with `sem.MarkdownReferenceProblems` and writes the embedded runner (`internal/cli/docs_init.go`) |
 | `init-agents`, `agent-guide` | `internal/agentsetup` (writes `.entire/agent-guide.md` and the managed blocks) |
 
 - **Languages:** `languageForPath` (`parser.go`) routes a file to `treeSitterLanguages`

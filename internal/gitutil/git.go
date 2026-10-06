@@ -139,6 +139,31 @@ func CommitAndTree(ctx context.Context, repo, rev string) (string, string, error
 	return commit, tree, nil
 }
 
+// DeletedPaths reports which of paths HEAD's history has deleted at some point.
+// --no-renames makes a moved file count as deleted from its old path, and each
+// path is a literal pathspec, so repository-derived names cannot inject pathspec
+// magic. One process covers every path.
+func DeletedPaths(ctx context.Context, repo string, paths []string) (map[string]bool, error) {
+	deleted := map[string]bool{}
+	if len(paths) == 0 {
+		return deleted, nil
+	}
+	args := []string{"log", "--no-renames", "--diff-filter=D", "--name-only", "--format=", "HEAD", "--"}
+	for _, path := range paths {
+		args = append(args, treeMetadataLiteralPrefix+path)
+	}
+	out, err := run(ctx, repo, "git", args...)
+	if err != nil {
+		return nil, err
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			deleted[line] = true
+		}
+	}
+	return deleted, nil
+}
+
 // MergeBase returns the best common ancestor of a and b, the base that
 // `git diff a...b` compares against.
 func MergeBase(ctx context.Context, repo, a, b string) (string, error) {

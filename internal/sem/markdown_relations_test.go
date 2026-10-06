@@ -2,6 +2,7 @@ package sem
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -128,5 +129,65 @@ func TestMarkdownCodeSpansUnmatchedRunsAreLinear(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatalf("markdownCodeSpans on an %d-byte line of unmatched runs did not finish in 2s", line.Len())
+	}
+}
+
+func TestMarkdownReferenceProblemsReportsOnlyWhatItCanDecide(t *testing.T) {
+	const repoKey = "local/example"
+	contents := map[string]string{
+		"README.md": strings.Join([]string{
+			"# Guide",
+			"Call `thing.Helper()` and `thing.Gone()`. `json.Marshal` is external and `thing.go` is a file name.",
+			"See `thing/thing.go:3`, `thing/old.go`, `thing/example.go`, `thing/<lang>.go` and `docs/*.md`.",
+			"Links: [guide](docs/guide.md#some-heading), [bad anchor](docs/guide.md#nope), [missing](docs/nope.md),",
+			"[dir](thing/), [image](img/logo.png), [site](https://example.com), [self](#guide), [self bad](#nowhere).",
+			"```go",
+			"`thing.Gone()` and [this](docs/nope.md) are inside a fence.",
+			"```",
+		}, "\n"),
+		"docs/guide.md":  "# Some Heading\n\nBack to [the readme](../README.md#guide).\n",
+		"thing/thing.go": "package thing\n\nfunc Helper() {}\n",
+	}
+	var snapshot ProviderSnapshot
+	for path, content := range contents {
+		language, entities := "Markdown", markdownEntities(content)
+		if !strings.HasSuffix(path, ".md") {
+			var status ParseStatus
+			entities, _, status = TreeSitterParser{}.ParseWithStatus(path, content)
+			if status.ParseError {
+				t.Fatalf("parse %s: %s", path, status.Detail)
+			}
+			language = "Go"
+		}
+		snapshot.Files = append(snapshot.Files, FileRecord{ID: fileID(repoKey, path), Path: path, Language: language})
+		snapshot.Symbols = append(snapshot.Symbols, entitySymbols(repoKey, path, language, entities)...)
+	}
+	readLines := func(path string) ([]string, bool) {
+		content, ok := contents[path]
+		return strings.Split(content, "\n"), ok
+	}
+
+	var got []string
+	// Only old.go was ever in the repository; example.go is an illustration.
+	var asked []string
+	removedPaths := func(paths []string) map[string]bool {
+		asked = paths
+		return map[string]bool{"thing/old.go": true}
+	}
+	for _, problem := range MarkdownReferenceProblems(snapshot, readLines, removedPaths) {
+		got = append(got, problem.Path+":"+strconv.Itoa(problem.Line)+" "+problem.Kind+" "+problem.Target)
+	}
+	want := []string{
+		"README.md:2 stale_name thing.Gone()",
+		"README.md:3 stale_path thing/old.go",
+		"README.md:4 missing_anchor docs/guide.md#nope",
+		"README.md:4 broken_link docs/nope.md",
+		"README.md:5 missing_anchor #nowhere",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("problems =\n  %s\nwant\n  %s", strings.Join(got, "\n  "), strings.Join(want, "\n  "))
+	}
+	if strings.Join(asked, ",") != "thing/old.go,thing/example.go" {
+		t.Fatalf("history was asked about %q, want both missing paths", asked)
 	}
 }

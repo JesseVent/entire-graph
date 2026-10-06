@@ -73,6 +73,9 @@ type docsReason struct {
 }
 
 func runDocs(ctx context.Context, opts Options, args []string) error {
+	if len(args) > 0 && args[0] == "init" {
+		return runDocsInit(ctx, opts, args[1:])
+	}
 	flags, err := parseDocsFlags(args)
 	if err != nil {
 		return err
@@ -282,7 +285,9 @@ func buildDocsResponse(base, head sem.ProviderSnapshot, readBase, readHead lineR
 		item := items[fromID]
 		if item == nil {
 			var ok bool
-			if item, ok = docsItemFor(fromID, headSymbols, headFilePaths); !ok {
+			// An archived doc or a changelog records the past; it is not
+			// expected to follow the code.
+			if item, ok = docsItemFor(fromID, headSymbols, headFilePaths); !ok || sem.MarkdownHistoricalDoc(item.Path) {
 				return
 			}
 			items[fromID] = item

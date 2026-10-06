@@ -14,6 +14,7 @@ Pass `--repo .` (or a path) when running outside an Entire session.
 | Command | What it does |
 | --- | --- |
 | `init-agents` | Writes `.entire/graph-agent.md` and managed blocks in `AGENTS.md`/`CLAUDE.md`. See [agent activation](agents.md). |
+| `docs init` | Audits the drift your docs already have (links to missing docs or headings, paths the repository has since deleted, qualified names that no longer exist), shows which code no doc names, and adds the Doc staleness trail runner when `.entire/runners/` exists. Run it once when you start tracking docs. |
 | `agent-guide` | Prints the operating guide `init-agents` installs, for inspection or piping elsewhere. |
 | `index` | Prewarms one committed-tree cache variant before a batch of `--head` queries. Defaults to `--profile full`; see the [operations cache guide](operations.md#cache). |
 | `capabilities` | Reports semantic vs inventory-only languages, relation types, profiles, and features as JSON. Feature-detect with this before relying on a relation family. |
