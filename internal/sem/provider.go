@@ -51,7 +51,12 @@ const (
 	// `C.helper` (kind "method"). This re-keys every Python nested-callable
 	// symbol, and it un-keys the `#sig:` suffixes that the phantom forced onto
 	// real same-named members.
-	IdentityRevision     = "3"
+	//
+	// Revision 4: Markdown extraction tracks fences, so a `# comment` inside a
+	// code fence is no longer a phantom `section`, and a closing fence is no
+	// longer a second `code_fence_N_text`. Removing those renumbers every later
+	// `code_fence_N` in the file.
+	IdentityRevision     = "4"
 	defaultMaxParseBytes = 4 * 1024 * 1024
 	// defaultMaxSourceFiles bounds how many files one snapshot will list. The
 	// per-file indexes a snapshot keeps (one file record and its retained symbols)

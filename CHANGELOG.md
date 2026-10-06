@@ -38,6 +38,7 @@ auto-generated notes on
 - Fixed pipeline workers to observe shared context correctly, closed a map-race condition, and fixed the semantic diff to report pure file renames instead of hiding them.
 - Fixed the doctor handshake, git-metadata error reporting, and repository agent activation so failures explain themselves and activation survives initializers.
 - Fixed statusline to prefer the managed install over a stray developer build, and fixed the LoCoMo benchmark reproduction kit to run off the author's machine with stronger scoring and redaction guards.
+- Fixed Markdown extraction to track code fences, so a `# comment` inside a fence is no longer reported as a section and a closing fence is no longer a second code fence. This re-keys later `code_fence_N` symbols (identity revision 4).
 
 ### Security
 
