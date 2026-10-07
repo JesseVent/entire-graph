@@ -171,7 +171,7 @@ func loadCachedCompleteSearchSnapshotBinding(
 		return preloadedCompleteSnapshot{}, false, nil
 	}
 	options = capturedOptions
-	commit, tree, headErr := resolveCommittedHEAD(ctx, absRepo)
+	commit, tree, headErr := resolveCommittedRevision(ctx, absRepo, options.committedRevision())
 	if headErr != nil {
 		return preloadedCompleteSnapshot{}, false, nil
 	}
@@ -250,7 +250,7 @@ func loadOrBuildSearchSnapshot(
 		return snapshot, false, buildErr
 	}
 	options = capturedOptions
-	commit, tree, headErr := resolveCommittedHEAD(ctx, absRepo)
+	commit, tree, headErr := resolveCommittedRevision(ctx, absRepo, options.committedRevision())
 	if headErr != nil {
 		snapshot, buildErr := BuildProviderSnapshotWithOptions(ctx, repo, providerVersion, options)
 		return snapshot, false, buildErr

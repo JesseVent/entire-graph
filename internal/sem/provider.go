@@ -451,8 +451,12 @@ type ProviderSnapshot struct {
 }
 
 type ProviderSnapshotOptions struct {
-	NoNetwork    bool
-	Worktree     bool
+	NoNetwork bool
+	Worktree  bool
+	// Revision snapshots this committed revision instead of HEAD. Empty means
+	// HEAD; it is ignored with Worktree. Caches stay keyed by tree, so a
+	// revision whose tree matches HEAD's shares HEAD's entry.
+	Revision     string
 	IgnoreFiles  []string
 	IncludeFiles []string
 	// OnlyFiles restricts parsing to these exact repository-relative paths.
@@ -1823,7 +1827,7 @@ func prepareSource(ctx context.Context, repo string, options ProviderSnapshotOpt
 	ctx, metadataSafe := newGitMetadataValidation(ctx, absRepo)
 	if metadataSafe {
 		key = repoKey(ctx, absRepo)
-		commit, tree, headErr = resolveCommittedHEAD(ctx, absRepo)
+		commit, tree, headErr = resolveCommittedRevision(ctx, absRepo, options.committedRevision())
 	} else {
 		headErr = gitMetadataRefusalError(absRepo)
 	}
@@ -1916,14 +1920,32 @@ func resolveMaxParseBytes(requested int) int {
 // HEAD expression, preventing mixed commit/tree provenance if HEAD advances
 // between subprocesses.
 func resolveCommittedHEAD(ctx context.Context, repo string) (string, string, error) {
+	return resolveCommittedRevision(ctx, repo, "")
+}
+
+// committedRevision is the revision a snapshot binds to: options.Revision, or
+// HEAD (empty) for a working-tree snapshot, whose provenance is always HEAD.
+func (options ProviderSnapshotOptions) committedRevision() string {
+	if options.Worktree {
+		return ""
+	}
+	return options.Revision
+}
+
+// resolveCommittedRevision is resolveCommittedHEAD for ProviderSnapshotOptions.Revision;
+// an empty revision means HEAD.
+func resolveCommittedRevision(ctx context.Context, repo, revision string) (string, string, error) {
 	if !gitMetadataSafeForSubprocessContext(ctx, repo) {
 		err := gitMetadataRefusalError(repo)
 		return "", "", err
 	}
-	commit, tree, err := gitutil.HeadCommitAndTree(ctx, repo)
+	if revision == "" {
+		revision = "HEAD"
+	}
+	commit, tree, err := gitutil.CommitAndTree(ctx, repo, revision)
 	if err != nil || commit == "" {
 		if err == nil {
-			err = errors.New("HEAD resolved to an empty commit")
+			err = fmt.Errorf("%s resolved to an empty commit", revision)
 		}
 		return "", "", err
 	}

@@ -122,15 +122,31 @@ func RevParse(ctx context.Context, repo, rev string) (string, error) {
 // one show operation prevents a concurrent HEAD update from mixing provenance
 // from two different commits.
 func HeadCommitAndTree(ctx context.Context, repo string) (string, string, error) {
-	out, err := run(ctx, repo, "git", "show", "-s", "--no-show-signature", "--no-notes", "--format=%H%x00%T", "--end-of-options", "HEAD^{commit}")
+	return CommitAndTree(ctx, repo, "HEAD")
+}
+
+// CommitAndTree is HeadCommitAndTree for any revision. rev can be a
+// caller-supplied label, so it is passed after --end-of-options.
+func CommitAndTree(ctx context.Context, repo, rev string) (string, string, error) {
+	out, err := run(ctx, repo, "git", "show", "-s", "--no-show-signature", "--no-notes", "--format=%H%x00%T", "--end-of-options", rev+"^{commit}")
 	if err != nil {
 		return "", "", err
 	}
 	commit, tree, ok := strings.Cut(strings.TrimSuffix(out, "\n"), "\x00")
 	if !ok || commit == "" || tree == "" || strings.ContainsAny(commit, "\x00\r\n") || strings.ContainsAny(tree, "\x00\r\n") {
-		return "", "", errors.New("git show returned malformed HEAD commit/tree metadata")
+		return "", "", fmt.Errorf("git show returned malformed %s commit/tree metadata", rev)
 	}
 	return commit, tree, nil
+}
+
+// MergeBase returns the best common ancestor of a and b, the base that
+// `git diff a...b` compares against.
+func MergeBase(ctx context.Context, repo, a, b string) (string, error) {
+	out, err := run(ctx, repo, "git", "merge-base", "--end-of-options", a, b)
+	if err != nil {
+		return "", fmt.Errorf("merge base of %s and %s: %w", a, b, err)
+	}
+	return strings.TrimSpace(out), nil
 }
 
 func FirstParent(ctx context.Context, repo, rev string) (string, error) {

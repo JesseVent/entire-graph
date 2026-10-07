@@ -20,7 +20,7 @@ auto-generated notes on
 - Added nightly LoCoMo benchmark CI for the entire-graph arm, authenticated via OIDC with no stored credentials.
 - Added a `NOTICES` file to every release archive, covering the third-party parser sources and Go modules statically linked into the binary.
 - Added experimental `X-entire-graph:MENTIONS` and `X-entire-graph:LINKS_TO` relations (full profile): a Markdown section links to the code symbols and repository files it names in inline code, and to the files and sections it links to, so a change can be traced to the docs that describe it. `neighbors` and `snapshot-query` now match relation types case-insensitively, which extension types need.
-- Added `graph docs`, which lists the Markdown sections a working-tree change probably made stale (they name a changed or removed symbol, link to a changed section, or usually change with a changed code file), and told agents in the generated guide to run it and update those sections in the same change.
+- Added `graph docs`, which lists the Markdown sections a working-tree change probably made stale (they name a changed or removed symbol, link to a changed section, or usually change with a changed code file), and told agents in the generated guide to run it and update those sections in the same change. `--base <ref>` covers a branch's commits as well, comparing from the merge base like `git diff <ref>...HEAD`.
 
 ### Changed
 

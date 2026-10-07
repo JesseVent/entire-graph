@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/entireio/entire-graph/internal/gitutil"
 	"github.com/entireio/entire-graph/internal/sem"
 )
 
@@ -183,22 +184,76 @@ func TestDocsReportsBothSnapshotsParseFailures(t *testing.T) {
 	t.Parallel()
 	broken := sem.PartialFailure{Code: "parse_error", Severity: "error", FilePath: "app/broken.go", Language: "Go"}
 	removed := sem.PartialFailure{Code: "parse_error", Severity: "error", FilePath: "app/gone.go", Language: "Go"}
+	brokenFile := sem.FileRecord{ID: "file:app/broken.go", Path: "app/broken.go", Blob: "1", Language: "Go"}
 	base := sem.ProviderSnapshot{Header: sem.SnapshotHeader{Commit: "c", PartialFailures: []sem.PartialFailure{broken, removed},
-		Stats: sem.ProviderStats{CompletenessLevel: "degraded"}}}
+		Stats: sem.ProviderStats{CompletenessLevel: "degraded"}},
+		Files: []sem.FileRecord{brokenFile, {ID: "file:app/gone.go", Path: "app/gone.go", Blob: "1", Language: "Go"}}}
 	head := sem.ProviderSnapshot{Header: sem.SnapshotHeader{PartialFailures: []sem.PartialFailure{broken},
 		Stats: sem.ProviderStats{CompletenessLevel: "ok"}},
-		Files: []sem.FileRecord{{ID: "file:app/new.go", Path: "app/new.go", Blob: "1", Language: "Go"}}}
+		Files: []sem.FileRecord{brokenFile, {ID: "file:app/new.go", Path: "app/new.go", Blob: "1", Language: "Go"}}}
 
-	// A failure in either snapshot can hide docs from the list, so both are
-	// reported once each, and the worse completeness level wins.
+	// JSON reports both snapshots' failures once each, with the worse
+	// completeness level. Only gone.go, which the change removed, can hide a
+	// doc; broken.go is unchanged, so text output leaves it out.
 	got := buildDocsResponse(base, head, nil, nil, 50)
 	if len(got.PartialFailures) != 2 || got.PartialFailures[0] != broken || got.PartialFailures[1] != removed ||
-		got.Stats.CompletenessLevel != "degraded" {
-		t.Fatalf("partial_failures = %+v, level = %q", got.PartialFailures, got.Stats.CompletenessLevel)
+		got.Stats.CompletenessLevel != "degraded" || len(got.AffectingFailures) != 1 || got.AffectingFailures[0] != removed {
+		t.Fatalf("partial_failures = %+v, affecting = %+v, level = %q", got.PartialFailures, got.AffectingFailures, got.Stats.CompletenessLevel)
 	}
 	var text bytes.Buffer
 	writeDocsText(&text, got)
-	if !strings.Contains(text.String(), "Completeness: degraded") || !strings.Contains(text.String(), "app/gone.go") {
-		t.Fatalf("text output does not report the failures:\n%s", text.String())
+	if !strings.Contains(text.String(), "Incomplete: 1 changed or Markdown file failed to parse") ||
+		!strings.Contains(text.String(), "app/gone.go") || strings.Contains(text.String(), "app/broken.go") {
+		t.Fatalf("text output does not report only the affecting failure:\n%s", text.String())
+	}
+}
+
+func TestDocsBaseCoversABranchsCommits(t *testing.T) {
+	t.Parallel()
+	repo := t.TempDir()
+	git(t, repo, "init", "-b", "main")
+	git(t, repo, "config", "user.name", "Entire Graph Tests")
+	git(t, repo, "config", "user.email", "tests@entire.local")
+	write(t, repo, "app/app.go", "package app\n\nfunc Orders() int { return 1 }\n")
+	write(t, repo, "README.md", "# Orders\nCall `Orders()` for the list.\n")
+	git(t, repo, "add", ".")
+	git(t, repo, "commit", "-m", "fixture")
+	branchPoint, err := gitutil.RevParse(t.Context(), repo, "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	git(t, repo, "checkout", "-b", "feature")
+	write(t, repo, "app/app.go", "package app\n\nfunc Orders() int { return 2 }\n")
+	git(t, repo, "commit", "-am", "change Orders")
+	// main moving on after the branch point must not count as a change: the
+	// base is the merge base, as in `git diff main...HEAD`.
+	git(t, repo, "checkout", "main")
+	write(t, repo, "app/other.go", "package app\n\nfunc Other() int { return 1 }\n")
+	git(t, repo, "add", ".")
+	git(t, repo, "commit", "-m", "main moves on")
+	git(t, repo, "checkout", "feature")
+
+	cacheDir := t.TempDir()
+	run := func(args ...string) docsResponse {
+		t.Helper()
+		var out bytes.Buffer
+		args = append([]string{"docs", "--repo", repo, "--cache-dir", cacheDir, "--format", "json"}, args...)
+		if err := Run(t.Context(), Options{Version: "0.1.0", Env: EntireEnv{RepoRoot: repo}, Stdout: &out}, args); err != nil {
+			t.Fatal(err)
+		}
+		var response docsResponse
+		if err := json.Unmarshal(out.Bytes(), &response); err != nil {
+			t.Fatalf("decode %s: %v", out.String(), err)
+		}
+		return response
+	}
+
+	if got := run(); got.ChangedFiles != 0 {
+		t.Fatalf("a committed branch has no uncommitted changes, got %+v", got)
+	}
+	got := run("--base", "main")
+	if got.BaseRef != "main" || got.BaseCommit != branchPoint || got.ChangedFiles != 1 ||
+		len(got.Items) != 1 || got.Items[0].Path != "README.md" || got.Items[0].Reasons[0].Target != "Orders" {
+		t.Fatalf("--base main = %+v; want README.md's Orders section against the branch point %s", got, branchPoint)
 	}
 }
