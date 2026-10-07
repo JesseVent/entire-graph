@@ -78,9 +78,9 @@ through the same writable namespace.
 
 ### Two cache families
 
-- The **search snapshot cache** backs `query`, `neighbors`, `impact`, and
-  `index`. It caches committed-tree (`--head`) queries; working-tree queries
-  always bypass it.
+- The **search snapshot cache** backs `query`, `neighbors`, `impact`, `index`,
+  and the committed side of `docs` (HEAD, or the `--base` merge base). It caches
+  committed-tree (`--head`) queries; working-tree queries always bypass it.
 - The **provider records cache** backs the bulk streams (`snapshot`,
   `symbols`, `edges`). It is committed-tree only; `--worktree` streams always
   bypass it.

@@ -37,7 +37,7 @@ and `neighbors` includes cache fields. Text output from `impact` and
 `neighbors` starts with an `Index: cache-hit` or `cache-miss` header. Agent
 output from `query` and `neighbors` normally uses that header, compacting it
 to `I:hit`/`I:miss` under a tight byte budget and potentially omitting it under
-an extreme cap. `query --format text` and `explain` report no cache state.
+an extreme cap. `query --format text`, `explain` and `docs` report no cache state.
 `def` and `explain` also skip the per-user fallback cache directory that the
 other query commands use; details are in the
 [operations cache guide](operations.md#cache).
