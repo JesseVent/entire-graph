@@ -130,6 +130,7 @@ automation. See the [command reference](docs/commands.md).
 | Check the blast radius | What would changing `ResolveRoute` affect? | `impact` |
 | Review a branch | Summarize the semantic changes from `main` to `HEAD`. | `diff` |
 | Keep docs current | Which docs did my change make stale? | `docs` |
+| Start tracking docs | Audit my docs for existing drift and set up the docs runner. | `docs init` |
 | Export the full graph | Export the repository graph as NDJSON. | `snapshot` |
 | Inspect indexing health | Show parser coverage and affected files, including healthy results. | `health` |
 

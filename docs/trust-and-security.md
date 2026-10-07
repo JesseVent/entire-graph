@@ -222,13 +222,16 @@ these rules existed misses instead of re-emitting the paths it named.
   it.
 - `verify --record-baseline <path>` creates parent directories as needed and
   writes a JSON baseline to the path you give it.
+- `docs init` writes one file, `.entire/runners/trail-docs.json`, and only when
+  `.entire/runners/` already exists and that file does not. It writes through
+  the same confined, symlink-refusing path as `index --report`.
 
 No other command family writes into the repository unless a caller-provided
 command does so.
 
 ## What it executes
 
-- Graph queries (`query`, `def`, `explain`, `neighbors`, `impact`) and
+- Graph queries (`query`, `def`, `explain`, `neighbors`, `impact`, `docs`) and
   streams run `git` subprocesses and parse files. They do not execute
   repository code.
 - `query` **suggests** a `VERIFY:` command derived from repository contents
