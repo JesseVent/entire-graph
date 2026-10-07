@@ -33,6 +33,13 @@ type docsResponse struct {
 	Items          []docsItem `json:"items"`
 	AlreadyUpdated int        `json:"already_updated"`
 	Truncated      int        `json:"truncated,omitempty"`
+	// Warnings and PartialFailures merge both snapshots' diagnostics, and Stats
+	// is the working tree's with the worse completeness level of the two. A file
+	// that failed to parse contributes no symbols, mentions or links, so docs
+	// pointing at it can be missing from Items.
+	Warnings        []sem.ProviderWarning `json:"warnings"`
+	PartialFailures []sem.PartialFailure  `json:"partial_failures"`
+	Stats           sem.ProviderStats     `json:"stats"`
 }
 
 type docsItem struct {
@@ -158,7 +165,17 @@ func parseDocsFlags(args []string) (docsFlags, error) {
 // records a mention of a symbol the change removed or renamed. A section the
 // change already edited is counted as updated rather than listed.
 func buildDocsResponse(base, head sem.ProviderSnapshot, readBase, readHead lineReader, limit int) docsResponse {
-	response := docsResponse{BaseCommit: base.Header.Commit, Items: []docsItem{}}
+	response := docsResponse{
+		BaseCommit:      base.Header.Commit,
+		Items:           []docsItem{},
+		Warnings:        mergeDiagnostics(head.Header.Warnings, base.Header.Warnings),
+		PartialFailures: mergeDiagnostics(head.Header.PartialFailures, base.Header.PartialFailures),
+		Stats:           head.Header.Stats,
+	}
+	if level := base.Header.Stats.CompletenessLevel; level != "" && level != "ok" &&
+		(response.Stats.CompletenessLevel == "" || response.Stats.CompletenessLevel == "ok") {
+		response.Stats.CompletenessLevel = level
+	}
 
 	baseFiles := map[string]sem.FileRecord{}
 	for _, file := range base.Files {
@@ -443,6 +460,22 @@ func docsHeading(symbol sem.SymbolRecord) string {
 	return strings.TrimPrefix(symbol.Signature, "markdown heading ")
 }
 
+// mergeDiagnostics concatenates diagnostic lists, dropping exact duplicates (a
+// file that fails to parse in both snapshots is reported once).
+func mergeDiagnostics[T comparable](lists ...[]T) []T {
+	merged := []T{}
+	seen := map[T]bool{}
+	for _, list := range lists {
+		for _, diagnostic := range list {
+			if !seen[diagnostic] {
+				seen[diagnostic] = true
+				merged = append(merged, diagnostic)
+			}
+		}
+	}
+	return merged
+}
+
 func writeDocsText(out io.Writer, response docsResponse) {
 	commit := response.BaseCommit
 	if len(commit) > 12 {
@@ -452,6 +485,9 @@ func writeDocsText(out io.Writer, response docsResponse) {
 		fmt.Fprintf(out, "No changes against HEAD (%s).\n", commit)
 		return
 	}
+	writeScopedCompletenessBlock(out,
+		completenessScopeOrAll(completenessScope{}, response.Warnings, response.PartialFailures, response.Stats),
+		response.Warnings, response.PartialFailures, response.Stats)
 	if len(response.Items) == 0 {
 		fmt.Fprintf(out, "No docs point at what changed against HEAD (%s): %d files, %d symbols.\n", commit, response.ChangedFiles, response.ChangedSymbols)
 	} else {
