@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.11.4-nightly.202610050640.3299a0f9d",
+  "checkpoint_id": "ff7a02cc729e",
+  "strategy": "manual-commit",
+  "branch": "fix/docs-runner-section-rules",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "internal/cli/docs_runner_prompt.txt"
+  ],
+  "sessions": [
+    {
+      "metadata": "/ff/7a02cc729e/0/metadata.json",
+      "transcript": "/ff/7a02cc729e/0/full.jsonl",
+      "compact_transcript": "/ff/7a02cc729e/0/transcript.jsonl",
+      "content_hash": "/ff/7a02cc729e/0/content_hash.txt",
+      "prompt": "/ff/7a02cc729e/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 20,
+    "cache_creation_tokens": 445045,
+    "cache_read_tokens": 3954399,
+    "output_tokens": 7683,
+    "api_call_count": 10
+  }
+}
