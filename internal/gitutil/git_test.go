@@ -3102,3 +3102,43 @@ func TestGrepTreePatternLinesRejectsInvalidTreeish(t *testing.T) {
 		}
 	}
 }
+
+func TestCommitAndTreeAndMergeBaseResolveABranchPoint(t *testing.T) {
+	t.Parallel()
+	repo := t.TempDir()
+	git(t, repo, "init", "-b", "main")
+	git(t, repo, "config", "user.name", "Entire Graph Test")
+	git(t, repo, "config", "user.email", "graph@example.com")
+	write(t, repo, "a.txt", "hi\n")
+	git(t, repo, "add", ".")
+	git(t, repo, "commit", "-m", "init")
+	branchPoint, err := RevParse(t.Context(), repo, "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	git(t, repo, "checkout", "-b", "feature")
+	write(t, repo, "a.txt", "feature\n")
+	git(t, repo, "commit", "-am", "feature")
+	git(t, repo, "checkout", "main")
+	write(t, repo, "b.txt", "main\n")
+	git(t, repo, "add", ".")
+	git(t, repo, "commit", "-m", "main moves on")
+
+	base, err := MergeBase(t.Context(), repo, "main", "feature")
+	if err != nil || base != branchPoint {
+		t.Fatalf("MergeBase = %q, %v; want the branch point %q", base, err, branchPoint)
+	}
+	commit, tree, err := CommitAndTree(t.Context(), repo, "feature")
+	wantTree, treeErr := RevParse(t.Context(), repo, "feature^{tree}")
+	if err != nil || treeErr != nil || tree != wantTree {
+		t.Fatalf("CommitAndTree(feature) = %q/%q, %v; want tree %q (%v)", commit, tree, err, wantTree, treeErr)
+	}
+	// A revision is passed after --end-of-options, so an option-shaped one is
+	// rejected as a bad revision rather than parsed as a flag.
+	if _, _, err := CommitAndTree(t.Context(), repo, "--output=x"); err == nil {
+		t.Fatal("CommitAndTree accepted an option-shaped revision")
+	}
+	if _, err := MergeBase(t.Context(), repo, "--all", "main"); err == nil {
+		t.Fatal("MergeBase accepted an option-shaped revision")
+	}
+}

@@ -51,7 +51,12 @@ const (
 	// `C.helper` (kind "method"). This re-keys every Python nested-callable
 	// symbol, and it un-keys the `#sig:` suffixes that the phantom forced onto
 	// real same-named members.
-	IdentityRevision     = "3"
+	//
+	// Revision 4: Markdown extraction tracks fences, so a `# comment` inside a
+	// code fence is no longer a phantom `section`, and a closing fence is no
+	// longer a second `code_fence_N_text`. Removing those renumbers every later
+	// `code_fence_N` in the file.
+	IdentityRevision     = "4"
 	defaultMaxParseBytes = 4 * 1024 * 1024
 	// defaultMaxSourceFiles bounds how many files one snapshot will list. The
 	// per-file indexes a snapshot keeps (one file record and its retained symbols)
@@ -96,6 +101,8 @@ var relationTypes = []string{
 	"RESOURCE_DEPENDS_ON",
 	"DATA_FLOWS",
 	"FILE_CHANGES_WITH",
+	MarkdownMentionsRelation,
+	MarkdownLinksToRelation,
 }
 
 // ooRelationSupport lists the additional (non-structural) relation types the
@@ -205,6 +212,7 @@ var ooRelationSupport = map[string][]string{
 	"TOML":             {"CONFIGURES"},
 	"XML":              {"CONFIGURES"},
 	"Make":             {"CONFIGURES"},
+	"Markdown":         {MarkdownMentionsRelation, MarkdownLinksToRelation},
 }
 
 // schemaFeatures lists the optional schema 1.1 features this build emits. It
@@ -443,8 +451,12 @@ type ProviderSnapshot struct {
 }
 
 type ProviderSnapshotOptions struct {
-	NoNetwork    bool
-	Worktree     bool
+	NoNetwork bool
+	Worktree  bool
+	// Revision snapshots this committed revision instead of HEAD. Empty means
+	// HEAD; it is ignored with Worktree. Caches stay keyed by tree, so a
+	// revision whose tree matches HEAD's shares HEAD's entry.
+	Revision     string
 	IgnoreFiles  []string
 	IncludeFiles []string
 	// OnlyFiles restricts parsing to these exact repository-relative paths.
@@ -677,7 +689,7 @@ func Capabilities() CapabilityReport {
 		SupportedRelationTypes:          append([]string(nil), relationTypes...),
 		RelationSupportByLanguage:       relationSupportByLanguage(),
 		RelationSupportByProfile:        relationSupportByProfile(),
-		HeuristicRelationTypes:          []string{"HANDLES_ROUTE", "HTTP_CALLS", "EMITS", "LISTENS_ON", "HANDLES_TOOL", "SIMILAR_TO", "TESTS"},
+		HeuristicRelationTypes:          []string{"HANDLES_ROUTE", "HTTP_CALLS", "EMITS", "LISTENS_ON", "HANDLES_TOOL", "SIMILAR_TO", "TESTS", MarkdownMentionsRelation},
 		OptionalLocalOnlyFeatures: map[string]bool{
 			"stable_symbol_ids":          true,
 			"semantic_diff":              true,
@@ -1815,7 +1827,7 @@ func prepareSource(ctx context.Context, repo string, options ProviderSnapshotOpt
 	ctx, metadataSafe := newGitMetadataValidation(ctx, absRepo)
 	if metadataSafe {
 		key = repoKey(ctx, absRepo)
-		commit, tree, headErr = resolveCommittedHEAD(ctx, absRepo)
+		commit, tree, headErr = resolveCommittedRevision(ctx, absRepo, options.committedRevision())
 	} else {
 		headErr = gitMetadataRefusalError(absRepo)
 	}
@@ -1908,14 +1920,32 @@ func resolveMaxParseBytes(requested int) int {
 // HEAD expression, preventing mixed commit/tree provenance if HEAD advances
 // between subprocesses.
 func resolveCommittedHEAD(ctx context.Context, repo string) (string, string, error) {
+	return resolveCommittedRevision(ctx, repo, "")
+}
+
+// committedRevision is the revision a snapshot binds to: options.Revision, or
+// HEAD (empty) for a working-tree snapshot, whose provenance is always HEAD.
+func (options ProviderSnapshotOptions) committedRevision() string {
+	if options.Worktree {
+		return ""
+	}
+	return options.Revision
+}
+
+// resolveCommittedRevision is resolveCommittedHEAD for ProviderSnapshotOptions.Revision;
+// an empty revision means HEAD.
+func resolveCommittedRevision(ctx context.Context, repo, revision string) (string, string, error) {
 	if !gitMetadataSafeForSubprocessContext(ctx, repo) {
 		err := gitMetadataRefusalError(repo)
 		return "", "", err
 	}
-	commit, tree, err := gitutil.HeadCommitAndTree(ctx, repo)
+	if revision == "" {
+		revision = "HEAD"
+	}
+	commit, tree, err := gitutil.CommitAndTree(ctx, repo, revision)
 	if err != nil || commit == "" {
 		if err == nil {
-			err = errors.New("HEAD resolved to an empty commit")
+			err = fmt.Errorf("%s resolved to an empty commit", revision)
 		}
 		return "", "", err
 	}
@@ -4715,7 +4745,7 @@ func forEachRelation(ctx context.Context, repoKey string, files []FileRecord, re
 	needsSignatureTypeImports := spec.emits("USES_TYPE") || spec.emits("PARAM_TYPE") || spec.emits("RETURNS_TYPE") || spec.emits("TESTS")
 	needsGlobalSymbolsByShortName := spec.callResolution == "full" || spec.callResolution == "shallow" ||
 		needsReceiverCalls || needsFields || needsTypes || needsOverrides || needsAsyncCalls ||
-		needsDataFlow || needsSignatureTypeImports
+		needsDataFlow || needsSignatureTypeImports || spec.emits(MarkdownMentionsRelation)
 	needsGlobalSymbolsByFile := needsGlobalSymbolsByShortName
 	symbolsByShortName := map[string][]SymbolRecord{}
 	symbolsByFile := map[string][]SymbolRecord{}
@@ -6442,6 +6472,14 @@ func forEachRelation(ctx context.Context, repoKey string, files []FileRecord, re
 	}
 	if spec.emits("TESTS") {
 		for _, r := range testRelations(recordsByFile, symbolsByShortName, resolvedImportsByFile) {
+			if shouldStop != nil && shouldStop() {
+				return
+			}
+			emit(r)
+		}
+	}
+	if spec.emits(MarkdownMentionsRelation) || spec.emits(MarkdownLinksToRelation) {
+		for _, r := range markdownRelations(repoKey, recordsByRelationSupport(recordsByFile, MarkdownLinksToRelation), symbolsByShortName, knownFiles, readContent, spec) {
 			if shouldStop != nil && shouldStop() {
 				return
 			}

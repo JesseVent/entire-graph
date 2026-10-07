@@ -122,15 +122,56 @@ func RevParse(ctx context.Context, repo, rev string) (string, error) {
 // one show operation prevents a concurrent HEAD update from mixing provenance
 // from two different commits.
 func HeadCommitAndTree(ctx context.Context, repo string) (string, string, error) {
-	out, err := run(ctx, repo, "git", "show", "-s", "--no-show-signature", "--no-notes", "--format=%H%x00%T", "--end-of-options", "HEAD^{commit}")
+	return CommitAndTree(ctx, repo, "HEAD")
+}
+
+// CommitAndTree is HeadCommitAndTree for any revision. rev can be a
+// caller-supplied label, so it is passed after --end-of-options.
+func CommitAndTree(ctx context.Context, repo, rev string) (string, string, error) {
+	out, err := run(ctx, repo, "git", "show", "-s", "--no-show-signature", "--no-notes", "--format=%H%x00%T", "--end-of-options", rev+"^{commit}")
 	if err != nil {
 		return "", "", err
 	}
 	commit, tree, ok := strings.Cut(strings.TrimSuffix(out, "\n"), "\x00")
 	if !ok || commit == "" || tree == "" || strings.ContainsAny(commit, "\x00\r\n") || strings.ContainsAny(tree, "\x00\r\n") {
-		return "", "", errors.New("git show returned malformed HEAD commit/tree metadata")
+		return "", "", fmt.Errorf("git show returned malformed %s commit/tree metadata", rev)
 	}
 	return commit, tree, nil
+}
+
+// DeletedPaths reports which of paths HEAD's history has deleted at some point.
+// --no-renames makes a moved file count as deleted from its old path, and each
+// path is a literal pathspec, so repository-derived names cannot inject pathspec
+// magic. One process covers every path.
+func DeletedPaths(ctx context.Context, repo string, paths []string) (map[string]bool, error) {
+	deleted := map[string]bool{}
+	if len(paths) == 0 {
+		return deleted, nil
+	}
+	args := []string{"log", "--no-renames", "--diff-filter=D", "--name-only", "--format=", "HEAD", "--"}
+	for _, path := range paths {
+		args = append(args, treeMetadataLiteralPrefix+path)
+	}
+	out, err := run(ctx, repo, "git", args...)
+	if err != nil {
+		return nil, err
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			deleted[line] = true
+		}
+	}
+	return deleted, nil
+}
+
+// MergeBase returns the best common ancestor of a and b, the base that
+// `git diff a...b` compares against.
+func MergeBase(ctx context.Context, repo, a, b string) (string, error) {
+	out, err := run(ctx, repo, "git", "merge-base", "--end-of-options", a, b)
+	if err != nil {
+		return "", fmt.Errorf("merge base of %s and %s: %w", a, b, err)
+	}
+	return strings.TrimSpace(out), nil
 }
 
 func FirstParent(ctx context.Context, repo, rev string) (string, error) {

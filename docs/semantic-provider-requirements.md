@@ -92,7 +92,8 @@ profile never silently drops a relation family.
   `HANDLES_GRAPHQL`, `HANDLES_TRPC`, `HTTP_CALLS`, `EMITS`, `LISTENS_ON`,
   `HANDLES_TOOL`, `CONFIGURES`, `SIMILAR_TO`, `TESTS`,
   `RESOURCE_DEPENDS_ON`, `DATA_FLOWS`, and `FILE_CHANGES_WITH`, with full
-  evidence. **Semantic-depth and accuracy claims belong to `full`.**
+  evidence, plus the experimental `X-entire-graph:MENTIONS` and
+  `X-entire-graph:LINKS_TO`. **Semantic-depth and accuracy claims belong to `full`.**
 - `fast` — symbol inventory plus `DEFINES`, `CONTAINS`, `IMPORTS`, `CALLS`,
   `CONSTRUCTS`, and `CONFIGURES`; call resolution is shallow and limited to
   single-target, high-precision resolutions — same-file
@@ -348,6 +349,18 @@ Relation vocabulary:
   normalized function/method bodies. Tiny bodies are suppressed and only pairs
   above an estimated-Jaccard threshold are emitted, with the estimate as
   confidence. Local-only; advertised as the `near_clone_detection` feature.
+- `X-entire-graph:MENTIONS` (experimental) — a Markdown section, or the file
+  for text above its first heading, names a code symbol or repository file in
+  inline code outside fences. A span that is a repository path (optionally
+  `:line`) resolves `exact` to the file. A span shaped like an identifier
+  (`Name`, `Name()`, `pkg.Name`, `Type.Member`) resolves `name_only` to a
+  function, method, field, constant, variable, or type, and only when exactly
+  one definition matches. A qualifier must match the candidate's qualified name
+  or its directory. Short (under 4 characters) and plain-lowercase spans are
+  skipped as prose.
+- `X-entire-graph:LINKS_TO` (experimental) — a Markdown section links to a
+  repository file, or to a section of one when the anchor matches its GitHub
+  heading anchor. External URLs, images, and links inside inline code are skipped.
 
 `EXTENDS`/`IMPLEMENTS` are extracted from class/interface headers (Java,
 TypeScript, JavaScript, C#, PHP, Python) and from Rust impl/supertrait syntax,
@@ -569,7 +582,7 @@ reproduce every Git-only policy and excluded files can therefore be present.
 
 The current globally pattern-driven set is reported as
 `heuristic_relation_types` (`HANDLES_ROUTE`, `HTTP_CALLS`, `EMITS`, `LISTENS_ON`, `HANDLES_TOOL`,
-`SIMILAR_TO`, `TESTS`). A test keeps this list aligned with
+`SIMILAR_TO`, `TESTS`, `X-entire-graph:MENTIONS`). A test keeps this list aligned with
 `capabilities --json`.
 
 ## Tests

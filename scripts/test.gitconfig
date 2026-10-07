@@ -1,0 +1,10 @@
+# The global Git config for `mise run test`. Fixture repositories must not see
+# the developer's own Git config: see the comment on [tasks.test] in mise.toml.
+#
+# With core.excludesFile unset, Git still falls back to $XDG_CONFIG_HOME/git/ignore
+# (~/.config/git/ignore), and a personal ignore list naming `dist/` or `.env` makes
+# fixture `git add`s silently drop the files those tests are about. Pin both
+# fallbacks to nothing.
+[core]
+	excludesFile = /dev/null
+	attributesFile = /dev/null

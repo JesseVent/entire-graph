@@ -19,6 +19,9 @@ auto-generated notes on
 - Added a persistent strict agent guidance mode, with Graph and Brain agent instructions coordinated to stay consistent.
 - Added nightly LoCoMo benchmark CI for the entire-graph arm, authenticated via OIDC with no stored credentials.
 - Added a `NOTICES` file to every release archive, covering the third-party parser sources and Go modules statically linked into the binary.
+- Added experimental `X-entire-graph:MENTIONS` and `X-entire-graph:LINKS_TO` relations (full profile): a Markdown section links to the code symbols and repository files it names in inline code, and to the files and sections it links to, so a change can be traced to the docs that describe it. `neighbors` and `snapshot-query` now match relation types case-insensitively, which extension types need.
+- Added `graph docs`, which lists the Markdown sections a working-tree change probably made stale (they name a changed or removed symbol, link to a changed section, or usually change with a changed code file), and told agents in the generated guide to run it and update those sections in the same change. `--base <ref>` covers a branch's commits as well, comparing from the merge base like `git diff <ref>...HEAD`.
+- Added `graph docs init`, the starting point for a repository adopting doc tracking: it audits existing drift (broken doc links and anchors, paths the repository has since deleted, qualified names that no longer exist), lists the most-referenced code no doc names, and adds a Doc staleness trail runner that scores how many of the doc sections pointing at a trail's changes it left out of date. Archived docs and changelogs are left out of both `docs` and `docs init`.
 
 ### Changed
 
@@ -38,6 +41,7 @@ auto-generated notes on
 - Fixed pipeline workers to observe shared context correctly, closed a map-race condition, and fixed the semantic diff to report pure file renames instead of hiding them.
 - Fixed the doctor handshake, git-metadata error reporting, and repository agent activation so failures explain themselves and activation survives initializers.
 - Fixed statusline to prefer the managed install over a stray developer build, and fixed the LoCoMo benchmark reproduction kit to run off the author's machine with stronger scoring and redaction guards.
+- Fixed Markdown extraction to track code fences, so a `# comment` inside a fence is no longer reported as a section and a closing fence is no longer a second code fence. This re-keys later `code_fence_N` symbols (identity revision 4).
 
 ### Security
 

@@ -14,6 +14,7 @@ Pass `--repo .` (or a path) when running outside an Entire session.
 | Command | What it does |
 | --- | --- |
 | `init-agents` | Writes `.entire/graph-agent.md` and managed blocks in `AGENTS.md`/`CLAUDE.md`. See [agent activation](agents.md). |
+| `docs init` | Audits the drift your docs already have (links to missing docs or headings, paths the repository has since deleted, qualified names that no longer exist), shows which code no doc names, and adds the Doc staleness trail runner when `.entire/runners/` exists. Run it once when you start tracking docs. |
 | `agent-guide` | Prints the operating guide `init-agents` installs, for inspection or piping elsewhere. |
 | `index` | Prewarms one committed-tree cache variant before a batch of `--head` queries. Defaults to `--profile full`; see the [operations cache guide](operations.md#cache). |
 | `capabilities` | Reports semantic vs inventory-only languages, relation types, profiles, and features as JSON. Feature-detect with this before relying on a relation family. |
@@ -48,6 +49,7 @@ other query commands use; details are in the
 | `commit <ref>` | Entity-level change list for a commit vs its first parent, with heuristic dependent counts. |
 | `diff --base A --head B` | The same between two refs. `analyze` is an alias of `diff`. |
 | `checkpoint <id>` | Analyzes the commit behind an Entire-Checkpoint trailer. |
+| `docs` | Lists the Markdown sections the working tree's changes against HEAD probably made stale, with reasons: they name a changed or removed symbol, link to a changed section, or usually change with a changed code file. Uses the experimental `X-entire-graph:MENTIONS` and `LINKS_TO` relations. `--base <ref>` starts from the merge base of that ref and HEAD, so a branch's commits are covered too. |
 | `verify` | Runs a caller-provided test command and returns an adjudicated verdict. This executes the command you pass it; see [trust and security](trust-and-security.md). |
 
 ## Export

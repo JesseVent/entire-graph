@@ -77,7 +77,7 @@ entire graph symbols --repo . --format ndjson [--worktree]
 **When:** you need the complete definition inventory (e.g. ingesting into a store), not a single lookup.
 
 ### 🔗 edges — *relations*
-Full stream of relation records across all 30 types (`CALLS`, `IMPORTS`, `EXTENDS`, `HANDLES_ROUTE`, …), each tagged with resolution and confidence. The stream is whole-repo by default; `--to`, `--from`, and `--relation` filter it server-side. For one symbol's callers/callees, prefer `neighbors` because it annotates resolved definitions and call sites from source.
+Full stream of relation records across all 30 core types (`CALLS`, `IMPORTS`, `EXTENDS`, `HANDLES_ROUTE`, …) plus the experimental Markdown types `X-entire-graph:MENTIONS` (a doc section names a symbol or file in inline code) and `X-entire-graph:LINKS_TO` (a doc section links to a file or section), each tagged with resolution and confidence. The stream is whole-repo by default; `--to`, `--from`, and `--relation` filter it server-side. For one symbol's callers/callees, prefer `neighbors` because it annotates resolved definitions and call sites from source.
 
 ```sh
 entire graph edges --repo . --format ndjson [--worktree] [--to ID|NAME] [--from ID|NAME] [--relation TYPE[,TYPE...]]
@@ -113,6 +113,17 @@ entire graph checkpoint <id> --json                 # the commit behind an Entir
 ```
 
 **When:** judging whether a change is safe to keep / revert / continue, or reviewing a branch/PR. High dependent counts on a signature change = run tests first.
+
+### 📝 docs — *which docs did this change make stale?*
+Compares the working tree with HEAD and lists Markdown sections that point, one hop, at what changed: sections that name a changed or removed symbol in inline code (or a removed file by path), sections that link to a changed section or a removed file, and Markdown files that usually change with a changed code file but were not touched. Sections the change already edited are counted, not listed. Built on the experimental `X-entire-graph:MENTIONS` / `LINKS_TO` relations, so a doc that restates a fact without naming it is not found.
+
+```sh
+entire graph docs --repo . [--base origin/main] [--format text|json] [--limit 50]
+```
+
+**When:** after changing code or docs, before you stop: update the sections it lists in the same change. On a branch with commits already made, add `--base origin/main`: it compares from the merge base, like `git diff origin/main...HEAD`.
+
+`entire graph docs init --repo .` is the one-time starting point for a repository adopting this: it audits the drift its docs already have (broken doc links and anchors, paths the repository has since deleted, qualified names that no longer exist), lists the most-referenced code no doc names, and adds the Doc staleness trail runner when `.entire/runners/` exists. Archived docs and changelogs are left out of both commands.
 
 ### 🏗️ index — *build / warm one cache variant*
 Prebuilds a durable, complete committed-tree snapshot and verifies it was
@@ -198,6 +209,7 @@ locate  →  entire graph query --query "..."          (ranked code + file:line)
 impact  →  entire graph impact --symbol X              (one-shot blast radius: callers, types, data flow, co-change)
 callers →  entire graph neighbors --symbol X ...       (targeted callers/callees of X)
 change  →  entire graph diff --base A --head B          (entity-level, with dependents)
+docs    →  entire graph docs --repo .                  (doc sections your uncommitted change made stale)
 ingest  →  entire graph snapshot --format ndjson        (whole graph)
 report  →  entire graph stats --repo .                  (human-facing: graph vs grep/read usage + estimated token savings)
 ```

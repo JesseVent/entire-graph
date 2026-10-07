@@ -9,8 +9,9 @@ and it holds when a Brain brief has already reported locations: a brief reports
 where code is, not what depends on it. A Graph query after a brief is not redundant.
 Use Graph query, def, neighbors, and impact for code discovery and structural
 analysis. Use Graph diff, commit, and checkpoint for semantic comparisons of code
-revisions. Graph interactive queries normally inspect the working tree; Brain
-semantic answers refer to a stored index.
+revisions. After changing code or docs, run `entire graph docs --repo .` and update
+the doc sections it lists in the same change. Graph interactive queries normally
+inspect the working tree; Brain semantic answers refer to a stored index.
 Do not ask both tools the same question without an identified gap.
 
 Use Brain for task context and retained knowledge. Begin substantive tasks needing
@@ -20,8 +21,19 @@ orientation with:
 
 Skip this when equivalent task context is already available. Reuse useful code
 locations from the brief. Use Brain retrieval for previous decisions, attempts,
-documentation, and durable facts. Use Brain entities history to connect code changes
-to earlier checkpoints and sessions. Use Brain memory-informed review and workspace
+documentation, and durable facts - Brain's episodic memory of what was decided,
+what went wrong before, and what must stay true. Record one when you learn
+something durable that the code does not already state:
+
+    entire brain remember "<fact>" --path <category.subcategory.type> --json
+
+Categories are architecture, constraints, preferences, project and workflow.
+Omitting --path classifies the fact for you, which requires a supported coding
+agent on PATH. No MCP tool writes a fact, so this is a CLI call. Retrieve with
+recall, and re-check anchors with verify.
+
+Use Brain entities history to connect code changes to earlier checkpoints and
+sessions. Use Brain memory-informed review and workspace
 capabilities when relevant. Brain semantic answers refer to a stored index, which
 may differ from current working-tree source.
 
