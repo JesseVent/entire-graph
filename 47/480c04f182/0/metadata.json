@@ -1,0 +1,110 @@
+{
+  "cli_version": "0.11.4-nightly.202610050640.3299a0f9d",
+  "checkpoint_id": "47480c04f182",
+  "session_id": "01f054e8-f547-469c-9360-1e6ccad82720",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-07T00:25:53.561543Z",
+  "branch": "docs/doc-staleness-findings",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "docs/commands.md",
+    "docs/operations.md",
+    "docs/trust-and-security.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "5ee93e7719fc",
+  "checkpoint_transcript_start": 7143,
+  "transcript_lines_at_start": 7143,
+  "compact_transcript_start": 597,
+  "token_usage": {
+    "input_tokens": 40,
+    "cache_creation_tokens": 401900,
+    "cache_read_tokens": 7928700,
+    "output_tokens": 10518,
+    "api_call_count": 20
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-init-2026-10-06T01:56:06.647813Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "init"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "661580bc3f23",
+      "timestamp": "2026-10-06T01:56:06.647813Z",
+      "native": {
+        "command": "/init"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/init",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01MdC786TgoRh5PmUKQcCKHX",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "claude-md-improver"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "9c020699f3c2",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 40,
+        "end": 41,
+        "entry_ids": [
+          "d3ff0382-4d57-4bb7-b30c-631b85e8fca7"
+        ],
+        "tool_use_id": "toolu_01MdC786TgoRh5PmUKQcCKHX"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01MdC786TgoRh5PmUKQcCKHX"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: claude-md-improver",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 25
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-07T00:25:53.37626Z",
+    "agent_lines": 8,
+    "agent_removed": 5,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 8,
+    "total_lines_changed": 13,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 6,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.local.json": 6
+      }
+    }
+  ]
+}

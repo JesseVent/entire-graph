@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.11.4-nightly.202610050640.3299a0f9d",
+  "checkpoint_id": "47480c04f182",
+  "strategy": "manual-commit",
+  "branch": "docs/doc-staleness-findings",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "docs/commands.md",
+    "docs/operations.md",
+    "docs/trust-and-security.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/47/480c04f182/0/metadata.json",
+      "transcript": "/47/480c04f182/0/full.jsonl",
+      "compact_transcript": "/47/480c04f182/0/transcript.jsonl",
+      "content_hash": "/47/480c04f182/0/content_hash.txt",
+      "prompt": "/47/480c04f182/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 40,
+    "cache_creation_tokens": 401900,
+    "cache_read_tokens": 7928700,
+    "output_tokens": 10518,
+    "api_call_count": 20
+  }
+}
