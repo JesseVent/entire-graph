@@ -72,7 +72,7 @@ EOF
 cat >docs/tax-rates.md <<'EOF'
 # Tax rates
 
-The default rate is 10%.
+The default rate is 10%. Totals are covered in [rounding](design.md#round).
 EOF
 git init -q -b main
 git add -A
@@ -82,6 +82,12 @@ git commit -qm "initial"
 printf '\n// Rates are fractions: 0.1 is 10%%.\n' >>billing/invoice.go
 printf '\nRates are fractions in code.\n' >>docs/tax-rates.md
 git commit -qam "document rate format"
+
+step "0. Starting out: audit the docs and add the trail runner"
+mkdir -p .entire/runners # stands in for `entire runner setup`
+printf '$ entire graph docs init\n'
+"$bin" docs init --repo . --cache-dir "$work/cache"
+git add .entire && git commit -qm "add the Doc staleness trail runner"
 
 step "Which docs mention TotalWithTax? (the graph edge behind docs)"
 printf '$ entire graph neighbors --symbol TotalWithTax --relation X-entire-graph:MENTIONS --direction in\n'

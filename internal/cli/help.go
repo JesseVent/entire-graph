@@ -392,9 +392,10 @@ var commandDocs = []commandDoc{
 		name:    "docs",
 		group:   groupAnalyze,
 		summary: "Docs your changes probably made stale",
-		usage:   []string{"entire graph docs [--repo path] [--base ref] [--format text|json] [--limit 50]"},
+		usage:   []string{"entire graph docs [--repo path] [--base ref] [--format text|json] [--limit 50]", "entire graph docs init [--repo path] [--format text|json] [--limit 50]"},
 		long: "Compares the working tree with HEAD and lists the Markdown sections that point, one hop, at what changed: sections that name a changed or removed symbol, or a removed file, in inline code; sections that link to a changed section or a removed file; and Markdown files that usually change with a changed code file but were not touched. Sections the change already edited are counted, not listed. Run it after changing code or docs and update the sections it lists in the same change.\n\n" +
 			"With --base, the comparison starts at the merge base of that ref and HEAD, as `git diff <ref>...HEAD` does, so a branch's commits are covered as well as uncommitted edits. Trail runners and CI use this form.\n\n" +
+			"`docs init` is the starting point for a repository adopting this. It audits the drift the docs already have (links to missing docs or headings, inline-code paths the repository has since deleted, qualified names whose package or type no longer has that member), counts the doc sections that name code, lists the most-referenced code directories no doc names, and adds the Doc staleness trail runner (.entire/runners/trail-docs.json) when .entire/runners exists, never replacing one already there. Archived docs and changelogs are not audited.\n\n" +
 			"Mentions and links are the experimental X-entire-graph:MENTIONS and X-entire-graph:LINKS_TO relations, so a name used in a doc only lexically, or a section that restates a fact without naming it, is not found. Builds the full-profile base snapshot (cached) and the working-tree snapshot.",
 		flags: []flagDoc{
 			{name: "--repo", arg: "path", desc: "Repository (default: current repo)"},
@@ -403,7 +404,7 @@ var commandDocs = []commandDoc{
 			{name: "--limit", arg: "n", def: "50", desc: "Max doc sections listed"},
 			{name: "--cache-dir", arg: "path", desc: "Override the shared index cache directory"},
 		},
-		examples: []string{"entire graph docs --repo .", "entire graph docs --repo . --base origin/main --format json"},
+		examples: []string{"entire graph docs --repo .", "entire graph docs --repo . --base origin/main --format json", "entire graph docs init --repo ."},
 	},
 	{
 		name:    "verify",

@@ -123,6 +123,8 @@ entire graph docs --repo . [--base origin/main] [--format text|json] [--limit 50
 
 **When:** after changing code or docs, before you stop: update the sections it lists in the same change. On a branch with commits already made, add `--base origin/main`: it compares from the merge base, like `git diff origin/main...HEAD`.
 
+`entire graph docs init --repo .` is the one-time starting point for a repository adopting this: it audits the drift its docs already have (broken doc links and anchors, paths the repository has since deleted, qualified names that no longer exist), lists the most-referenced code no doc names, and adds the Doc staleness trail runner when `.entire/runners/` exists. Archived docs and changelogs are left out of both commands.
+
 ### 🏗️ index — *build / warm one cache variant*
 Prebuilds a durable, complete committed-tree snapshot and verifies it was
 written before latency-sensitive work. Reuse is cache-variant-specific: a

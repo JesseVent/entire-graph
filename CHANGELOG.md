@@ -21,6 +21,7 @@ auto-generated notes on
 - Added a `NOTICES` file to every release archive, covering the third-party parser sources and Go modules statically linked into the binary.
 - Added experimental `X-entire-graph:MENTIONS` and `X-entire-graph:LINKS_TO` relations (full profile): a Markdown section links to the code symbols and repository files it names in inline code, and to the files and sections it links to, so a change can be traced to the docs that describe it. `neighbors` and `snapshot-query` now match relation types case-insensitively, which extension types need.
 - Added `graph docs`, which lists the Markdown sections a working-tree change probably made stale (they name a changed or removed symbol, link to a changed section, or usually change with a changed code file), and told agents in the generated guide to run it and update those sections in the same change. `--base <ref>` covers a branch's commits as well, comparing from the merge base like `git diff <ref>...HEAD`.
+- Added `graph docs init`, the starting point for a repository adopting doc tracking: it audits existing drift (broken doc links and anchors, paths the repository has since deleted, qualified names that no longer exist), lists the most-referenced code no doc names, and adds a Doc staleness trail runner that scores how many of the doc sections pointing at a trail's changes it left out of date. Archived docs and changelogs are left out of both `docs` and `docs init`.
 
 ### Changed
 
